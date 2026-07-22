@@ -1,0 +1,12 @@
+=== arrival 0.02 ===
+  ALL        : CR= 20.1+-14.9%  Thr= 5.83/min  Delay=  1.4s  (n=35)
+ System safety : ALL conflict rate vs p (does equipping the fleet make
+ Throughput    : ALL / group throughput and delay vs p (is safety
+=== arrival 0.03 ===
+  ALL        : CR= 17.6+-18.6%  Thr=10.33/min  Delay=  2.0s  (n=62)
+ System safety : ALL conflict rate vs p (does equipping the fleet make
+ Throughput    : ALL / group throughput and delay vs p (is safety
+=== arrival 0.04 ===
+  ALL        : CR= 36.8+-19.6%  Thr=15.33/min  Delay=  2.9s  (n=92)
+ System safety : ALL conflict rate vs p (does equipping the fleet make
+ Throughput    : ALL / group throughput and delay vs p (is safety

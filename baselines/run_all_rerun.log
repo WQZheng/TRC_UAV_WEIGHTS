@@ -1,0 +1,42 @@
+#### 01 CV ####
+[01 CV] device=cuda  n=200
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 12.0, 'minSep_m': 47.794953768404405, 'ADE_m': 0.8279240717499289, 'LeadT_s': 0.03700000000000002, 'Energy': 52.873862723664814, 'n': 200}
+[saved] /data/lab/plangrad/baselines/01_constant_velocity/result.txt + result.json
+#### 02 Vanilla ####
+[02 Vanilla-MPC] device=cuda  n=200  w_rep=50.0
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 41.0, 'minSep_m': 29.84171437373633, 'ADE_m': 4.321184706484628, 'LeadT_s': 0.06599999999999998, 'Energy': 19.109322465926894, 'n': 200}
+[saved] /data/lab/plangrad/baselines/02_vanilla_mpc/result.txt + result.json
+#### 04 Soft-IPP ####
+[04 Soft-IPP] device=cuda  n=200  weights=/data/lab/plangrad/baselines/04_soft_ipp/soft_joint.pt
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 53.0, 'minSep_m': 29.063270668297815, 'ADE_m': 6.4485703591618275, 'LeadT_s': 0.07999999999999993, 'Energy': 16.974993813873095, 'n': 200}
+[saved] /data/lab/plangrad/baselines/04_soft_ipp/result.txt + result.json
+#### 05 Conformal ####
+[05 Conformal-MPC] device=cuda  n=200  delta=0.1
+conformal radius r_conf = 18.57 m   {'n_scores': 3000, 'delta': 0.1, 'q_level': 0.9003333333333333, 'mean_score': 10.606399777887058, 'max_score': 64.55434121123953}
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 11.5, 'minSep_m': 48.77955729024094, 'ADE_m': 20.896425985018112, 'LeadT_s': 0.034000000000000016, 'Energy': 57.93389692785923, 'n': 200}
+[saved] /data/lab/plangrad/baselines/05_conformal_mpc/result.txt + result.json
+#### 00 PlanGrad ref ####
+[REF PlanGrad] device=cuda  n=200
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 11.0, 'minSep_m': 47.74423445544035, 'ADE_m': 4.321184706484628, 'LeadT_s': 0.03800000000000001, 'Energy': 52.348666713530584, 'n': 200}
+[saved] /data/lab/plangrad/baselines/00_plangrad_reference/result.txt + result.json
+ALL DONE

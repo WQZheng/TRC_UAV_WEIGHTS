@@ -1,0 +1,9 @@
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/cvxpy/problems/problem.py:1539: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+  warnings.warn(
+pairwise samples after warmup: 36185
+min pairwise separation EVER: 5.0 m  (d_sep=30.0)
+fraction of pair-samples within 1.5*d_sep (45m): 0.2%
+fraction below d_sep (30m, = conflict): 0.10%
+=> agents DO interact

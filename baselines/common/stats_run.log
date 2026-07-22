@@ -1,0 +1,25 @@
+collecting per-episode conflicts (n=200) ...
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+==========================================================================
+PAIRED STATISTICAL TESTS  (n=200, seed=12345, identical held-out encounters)
+CBF-equipped methods only; conflict = per-episode min sep < 30 m.
+==========================================================================
+method                   CR %   Wilson 95% CI         
+PlanGrad                11.0   [  7.4,  16.1]
+Conformal-MPC           11.5   [  7.8,  16.7]
+Fixed-Predictor         12.5   [  8.6,  17.8]
+Constant-Velocity       12.0   [  8.2,  17.2]
+
+McNemar exact paired test vs PlanGrad (H0: equal conflict propensity):
+  PlanGrad vs Conformal-MPC      discordant (PG-avoids/other-conflicts=2, PG-conflicts/other-avoids=1)  p=1.000  -> n.s.
+  PlanGrad vs Fixed-Predictor    discordant (PG-avoids/other-conflicts=3, PG-conflicts/other-avoids=0)  p=0.250  -> n.s.
+  PlanGrad vs Constant-Velocity  discordant (PG-avoids/other-conflicts=2, PG-conflicts/other-avoids=0)  p=0.500  -> n.s.
+
+Reading: overlapping CIs + all p>0.05 => the CBF-equipped methods are
+statistically indistinguishable on conflict rate at this sample size;
+no method's CR advantage over the others is significant. This is the
+intended finding (safety is certificate-governed), now tested rather
+than asserted.

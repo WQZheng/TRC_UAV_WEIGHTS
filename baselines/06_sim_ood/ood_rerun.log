@@ -1,0 +1,26 @@
+[RQ4 Sim-OOD] device=cuda  n=200  eta_w sweep=[0.5, 1.0, 1.5]
+conformal radius (fixed) = 18.57 m
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+  PlanGrad (ours)    eta=0.5  CR= 11.5  minSep= 47.8  LeadT=0.037  ADE= 4.32
+  PlanGrad (ours)    eta=1.0  CR= 11.5  minSep= 47.8  LeadT=0.037  ADE= 4.32
+  PlanGrad (ours)    eta=1.5  CR= 11.5  minSep= 47.8  LeadT=0.039  ADE= 4.32
+  Conformal-MPC      eta=0.5  CR= 11.5  minSep= 48.8  LeadT=0.034  ADE=20.90
+  Conformal-MPC      eta=1.0  CR= 11.5  minSep= 48.8  LeadT=0.034  ADE=20.90
+  Conformal-MPC      eta=1.5  CR= 11.5  minSep= 48.8  LeadT=0.034  ADE=20.90
+  Fixed-Predictor    eta=0.5  CR= 12.0  minSep= 46.4  LeadT=0.039  ADE=20.90
+  Fixed-Predictor    eta=1.0  CR= 11.5  minSep= 46.4  LeadT=0.039  ADE=20.90
+  Fixed-Predictor    eta=1.5  CR= 12.0  minSep= 46.3  LeadT=0.039  ADE=20.90
+  Constant-Velocity  eta=0.5  CR= 12.0  minSep= 47.8  LeadT=0.037  ADE= 0.83
+  Constant-Velocity  eta=1.0  CR= 12.0  minSep= 47.8  LeadT=0.037  ADE= 0.83
+  Constant-Velocity  eta=1.5  CR= 11.5  minSep= 47.8  LeadT=0.038  ADE= 0.83
+  Vanilla-MPC        eta=0.5  CR= 40.0  minSep= 29.9  LeadT=0.066  ADE= 4.32
+  Vanilla-MPC        eta=1.0  CR= 40.5  minSep= 29.8  LeadT=0.067  ADE= 4.32
+  Vanilla-MPC        eta=1.5  CR= 40.0  minSep= 29.9  LeadT=0.067  ADE= 4.32
+  Soft-IPP           eta=0.5  CR= 51.5  minSep= 29.1  LeadT=0.078  ADE= 6.45
+  Soft-IPP           eta=1.0  CR= 51.5  minSep= 29.1  LeadT=0.084  ADE= 6.45
+  Soft-IPP           eta=1.5  CR= 52.0  minSep= 29.1  LeadT=0.087  ADE= 6.45
+
+[saved] ood_results.json + ood_results.txt

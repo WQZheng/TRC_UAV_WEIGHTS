@@ -1,0 +1,8 @@
+FINAL2 compare (seed=12345, held-out 2500-3000, n=200)
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+Stage-1   CR=56.5%  minSep=27.7 m  ADE=14.24 m  minADE=14.22 m
+Stage-2   CR=28.5%  minSep=34.0 m  ADE=4.43 m  minADE=4.49 m
+delta     CR -28.0 pts  minSep +6.3 m  ADE -9.81 m

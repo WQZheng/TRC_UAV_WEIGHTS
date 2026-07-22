@@ -1,0 +1,5 @@
+nominal              CR= 11.5 MinSep=47.8  CR= 11.0 MinSep=47.7
+mass +20%            CR= 17.0 MinSep=42.8  CR= 17.5 MinSep=42.7
+thrust eff 0.85      CR= 16.0 MinSep=43.5  CR= 16.5 MinSep=43.5
+actuator delay 2     CR= 30.0 MinSep=35.9  CR= 28.0 MinSep=37.2
+combined             CR= 31.0 MinSep=33.2  CR= 30.0 MinSep=33.7

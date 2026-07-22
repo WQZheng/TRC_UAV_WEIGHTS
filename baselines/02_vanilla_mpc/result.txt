@@ -1,0 +1,11 @@
+method      : Vanilla-MPC (no CBF) + PlanGrad predictor
+eval_model  : stage2_final.pt (predictor); Vanilla-MPC planner
+n / seed    : 200 / 12345
+planner     : {'alpha': 0.1, 'horizon': 15, 'a_max': 20.0}  d_sep=30.0
+eval_range  : 2500-3000 (held-out)
+------------------------------------------------
+CR (%)      : 41.00
+minSep (m)  : 29.84
+ADE (m)     : 4.32
+LeadT (s)   : 0.066
+Energy      : 19.109

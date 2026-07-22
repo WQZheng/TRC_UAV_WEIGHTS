@@ -1,0 +1,8 @@
+BEST: planner alpha=0.1 Hp=15 a_max=20, n=200, seed 12345
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+Stage-1   CR=12.5%  minSep=46.3 m  ADE=20.90 m
+Stage-2   CR=11.0%  minSep=47.7 m  ADE=4.32 m
+delta     CR -1.5 pts  minSep +1.4 m  ADE -16.58 m

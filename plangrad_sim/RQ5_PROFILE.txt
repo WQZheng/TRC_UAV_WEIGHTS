@@ -1,0 +1,6 @@
+RQ5 critical/inert ERROR profile (n=200 seed=12345)
+critical = within 3 steps of closest approach; inert = rest
+model                          ADE(m)  critical(m)   inert(m) crit/inert
+stage1_full.pt                  20.90        13.53      23.14      0.585
+stage1b_domainadapt.pt           1.84         1.04       2.08      0.499
+stage2_final.pt                  4.32         4.07       4.40      0.925

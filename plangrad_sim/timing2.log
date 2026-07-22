@@ -1,0 +1,6 @@
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/cvxpy/problems/problem.py:1539: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+  warnings.warn(
+p=0.5 rep horizon=400: 50.1s  ALL CR=0.0% n=22 thr=20.0
+p=1.0 rep horizon=400: 78.1s  ALL CR=0.0% n=21 thr=20.0

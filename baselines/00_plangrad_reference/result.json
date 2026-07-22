@@ -1,0 +1,24 @@
+{
+  "method": "PlanGrad (OURS): Stage-2 + CBF-MPC (best planner)",
+  "eval_model": "stage2_final.pt + tuned CBF-MPC",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 11.0,
+    "minSep_m": 47.74423445544035,
+    "ADE_m": 4.321184706484628,
+    "LeadT_s": 0.03800000000000001,
+    "Energy": 52.348666713530584,
+    "n": 200
+  }
+}

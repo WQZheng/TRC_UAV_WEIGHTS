@@ -1,0 +1,11 @@
+==============================================================================
+MARKET-PENETRATION SWEEP  (fixed demand, vary equipped fraction p)
+arrival=0.08/step/end, horizon=400, warmup=100, reps=1, K=3, seed=12345
+Equipped = PlanGrad-UAV (predictor+CBF-MPC); Unequipped = ORCA.
+CR = per-agent conflict rate %%; Thr = passes/min; Delay = s.
+==============================================================================
+
+### p = 0% equipped
+  ALL        : CR= 29.2+- 0.0%  Thr=24.00/min  Delay=  3.0s  (n=24)
+  EQUIPPED   : CR=  nan+- nan%  Thr=  nan/min  Delay=  nans  (n=0)
+  UNEQUIPPED : CR= 29.2+- 0.0%  Thr=24.00/min  Delay=  3.0s  (n=24)

@@ -1,0 +1,11 @@
+method      : Constant-Velocity + CBF-MPC (best planner)
+eval_model  : ConstantVelocityPredictor (no training)
+n / seed    : 200 / 12345
+planner     : {'alpha': 0.1, 'horizon': 15, 'a_max': 20.0}  d_sep=30.0
+eval_range  : 2500-3000 (held-out)
+------------------------------------------------
+CR (%)      : 12.00
+minSep (m)  : 47.79
+ADE (m)     : 0.83
+LeadT (s)   : 0.037
+Energy      : 52.874

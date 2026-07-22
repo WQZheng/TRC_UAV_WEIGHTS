@@ -1,0 +1,24 @@
+{
+  "method": "Constant-Velocity + CBF-MPC (best planner)",
+  "eval_model": "ConstantVelocityPredictor (no training)",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 12.0,
+    "minSep_m": 47.794953768404405,
+    "ADE_m": 0.8279240717499289,
+    "LeadT_s": 0.03700000000000002,
+    "Energy": 52.873862723664814,
+    "n": 200
+  }
+}

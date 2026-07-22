@@ -1,0 +1,7 @@
+[03 Fixed-predictor] device=cuda  n=200
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+{'CR_%': 12.5, 'minSep_m': 46.33509107405549, 'ADE_m': 20.896425985018112, 'LeadT_s': 0.039000000000000014, 'Energy': 51.46677794719345, 'n': 200}
+[saved] /data/lab/plangrad/baselines/03_fixed_predictor/result.txt + result.json

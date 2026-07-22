@@ -1,0 +1,8 @@
+==============================================================================
+DETECTION-HORIZON (LEAD-TIME) SWEEP
+Tuned CBF-MPC (alpha=0.1 Hp=15 a_max=20 d_sep=30), n=200 seed=999
+CPA placed at t_cpa = horizon/dt steps; geometry otherwise fixed.
+Conflict = min separation < 30 m. Oracle = true neighbour future.
+==============================================================================
+ horiz |   S1 CR%   S2 CR%  Oracle% | attribution of S2 conflicts
+    3s |      1.5      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited

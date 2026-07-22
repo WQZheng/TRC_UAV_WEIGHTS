@@ -1,0 +1,15 @@
+DIRECTIONAL ERROR DECOMPOSITION (n=200 seed=12345)
+e_par = <pred-true, ego->neighbour unit>: >0 optimistic (farther from ego), <0 CONSERVATIVE (closer to ego). All in metres.
+Convention: e_par<0 = predicted neighbour CLOSER to ego than truth (conservative). SEM = sd/sqrt(n); |mean|>2*SEM ~ significant.
+
+Stage-1:
+  critical: e_par mean=-0.78 m  (SEM 0.30, sd 11.12)  frac(e_par<0)=54.2%  |e_perp|=8.33  ADE=13.43 m
+  inert   : e_par mean=+2.90 m  frac(e_par<0)=45.1%  ADE=22.77 m
+
+Stage-1b (domain-adapt):
+  critical: e_par mean=-0.19 m  (SEM 0.13, sd 4.60)  frac(e_par<0)=45.8%  |e_perp|=0.69  ADE=1.06 m
+  inert   : e_par mean=-0.36 m  frac(e_par<0)=47.6%  ADE=1.76 m
+
+Stage-2 (TASL):
+  critical: e_par mean=-0.36 m  (SEM 0.15, sd 5.67)  frac(e_par<0)=54.8%  |e_perp|=2.96  ADE=4.13 m
+  inert   : e_par mean=-0.33 m  frac(e_par<0)=48.9%  ADE=4.06 m
