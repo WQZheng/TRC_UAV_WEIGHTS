@@ -1,0 +1,29 @@
+% =====================================================================
+% Standalone compile wrapper for figure1_architecture.tex
+% Run pdflatex on this file to preview the figure in isolation.
+% =====================================================================
+\documentclass[border=10pt,multi,tikz]{standalone}
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  shapes.geometric,
+  decorations.pathreplacing,
+  calc,
+  fit,
+  backgrounds,
+  shadows,
+  patterns,
+  matrix,
+}
+
+% Declare background layer (needed because figure uses pgfonlayer)
+\pgfdeclarelayer{background}
+\pgfsetlayers{background,main}
+
+\begin{document}
+\input{figures/figure1_architecture}
+\end{document}

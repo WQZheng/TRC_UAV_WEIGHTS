@@ -1,0 +1,209 @@
+% =====================================================================
+% Figure 4 -- Prediction-Isolated vs. Joint Formulation
+%
+% Side-by-side comparison of (a) the conventional prediction-isolated
+% pipeline and (b) the joint formulation adopted in this paper.
+% The only structural difference is the orange dashed feedback arc
+% in panel (b) -- this carries the entire visual message.
+%
+% Standalone-compilable. Can also be \input from the main document.
+% =====================================================================
+
+\definecolor{Cinkblack}{HTML}{1A1A1A}
+\definecolor{Crulegrey}{HTML}{B0B5BB}
+\definecolor{Cbgblue}{HTML}{E3ECF7}
+\definecolor{Cbgyellow}{HTML}{FBF4DC}
+\definecolor{Cbggreen}{HTML}{E7F0E5}
+\definecolor{Cbggrey}{HTML}{F2F4F7}
+\definecolor{Caccorange}{HTML}{E8833A}
+\definecolor{Caccnavy}{HTML}{1E3A8A}
+\definecolor{Cevtolred}{HTML}{C0524A}
+\definecolor{Claneborder}{HTML}{CBD2D9}
+
+\begin{tikzpicture}[
+		font=\sffamily\small,
+		>=Stealth,
+		every node/.append style={text=Cinkblack},
+	]
+
+	% ---------------- Styles ---------------- %
+	\tikzset{
+		mainbox/.style = {
+				rectangle, rounded corners=3pt,
+				draw=Cinkblack, line width=0.7pt,
+				fill=white,
+				text width=3.6cm,
+				minimum height=1.4cm,
+				inner sep=5pt,
+				align=center,
+				font=\sffamily\small,
+			},
+		predbox/.style = {
+				mainbox, fill=Cbgblue,
+			},
+		planbox/.style = {
+				mainbox, fill=Cbggreen,
+			},
+		metricbox/.style = {
+				mainbox, fill=Cbggrey,
+			},
+		losslabel/.style = {
+				rectangle, rounded corners=2pt,
+				draw=Caccnavy, line width=0.5pt,
+				fill=white,
+				inner sep=3pt,
+				font=\sffamily\footnotesize\itshape,
+				text=Caccnavy,
+			},
+		losslabel/.append style = {align=center},
+		jointloss/.style = {
+				losslabel,
+				draw=Caccorange,
+				text=Caccorange,
+				line width=0.8pt,
+			},
+		fwd/.style = {
+				->, line width=0.7pt, draw=Cinkblack,
+			},
+		grad/.style = {
+				->, line width=1.4pt, draw=Caccorange, dashed,
+				dash pattern=on 5pt off 2.5pt,
+			},
+		paneltitle/.style = {
+				font=\sffamily\large\bfseries,
+				text=Cinkblack,
+				align=center,
+			},
+		panelsub/.style = {
+				font=\sffamily\footnotesize\itshape,
+				text=black!55,
+				align=center,
+			},
+		punchline/.style = {
+				rectangle, rounded corners=2pt,
+				inner sep=7pt,
+				text width=6.5cm,
+				align=center,
+				font=\sffamily\footnotesize\itshape,
+			},
+	}
+
+	% =====================================================================
+	% PANEL (a): prediction-isolated formulation  (LEFT)
+	% Three stacked boxes + L_ADE label on the side
+	% =====================================================================
+
+	% --- the three stacked boxes ---
+	\node[predbox]   (a-pred)   at (0,0)         {Predictor $f_\theta$};
+	\node[planbox]   (a-plan)   [below=8mm of a-pred] {Planner};
+	\node[metricbox] (a-metric) [below=8mm of a-plan] {Operational metrics};
+
+	% --- the loss label on the upper-left, pointing into the predictor ---
+	\node[losslabel] (a-loss) at ($(a-pred.west)+(-2.5cm,0)$)
+	{Loss:\\$\mathcal{L}_{\mathrm{ADE}}$};
+
+	\draw[fwd] (a-loss.east) -- (a-pred.west);
+
+	% --- forward arrows between the three boxes ---
+	\draw[fwd] (a-pred.south)   -- (a-plan.north)
+	node[midway, fill=white, inner sep=1pt, font=\sffamily\scriptsize\itshape,
+		text=Caccnavy] {predictions};
+	\draw[fwd] (a-plan.south)   -- (a-metric.north)
+	node[midway, fill=white, inner sep=1pt, font=\sffamily\scriptsize\itshape,
+		text=Caccnavy] {control actions};
+
+	% --- panel title and subtitle ---
+	\node[paneltitle, anchor=south]
+	at ([yshift=18pt]a-pred.north)
+	{(a) Prediction-Isolated};
+	\node[panelsub, anchor=south]
+	at ([yshift=2pt]a-pred.north)
+	{conventional pipeline};
+
+	% --- punch line below panel (a) ---
+	\node[punchline, fill=Cbggrey, draw=Claneborder, line width=0.4pt,
+	anchor=north]
+	at ([yshift=-12mm]a-metric.south)
+	{Predictor trained against displacement;\\
+	planner adapts to whatever it receives.\\[2pt]
+	{\footnotesize\bfseries No gradient flows back.}};
+
+	% =====================================================================
+	% PANEL (b): joint formulation  (RIGHT)
+	% Same three boxes, but with an orange feedback arc
+	% =====================================================================
+
+	% --- horizontal offset between panels ---
+	% Need enough room for: (a)'s right edge + central "vs." + (b)'s loss
+	% label on the left. Increased from 6.5cm to give the divider real
+	% breathing room.
+	\def\panelgap{9cm}
+
+	% --- the three stacked boxes ---
+	\node[predbox]   (b-pred)   at ($(a-pred)+(\panelgap,0)$)   {Predictor $f_\theta$};
+	\node[planbox]   (b-plan)   [below=8mm of b-pred] {Planner\\
+		\scriptsize\itshape (differentiable)};
+	\node[metricbox] (b-metric) [below=8mm of b-plan] {Operational metrics};
+
+	\node[jointloss] (b-loss) at ($(b-pred.west)+(-2.5cm,0)$)
+	{Loss:\\$\mathcal{L}_{\mathrm{TASL}}$};
+
+		\draw[fwd] (b-loss.east) -- (b-pred.west);
+
+		% --- forward arrows between the three boxes ---
+		\draw[fwd] (b-pred.south)   -- (b-plan.north)
+		node[midway, fill=white, inner sep=1pt, font=\sffamily\scriptsize\itshape,
+			text=Caccnavy] {predictions};
+		\draw[fwd] (b-plan.south)   -- (b-metric.north)
+		node[midway, fill=white, inner sep=1pt, font=\sffamily\scriptsize\itshape,
+			text=Caccnavy] {control actions};
+
+		% --- THE KEY DIFFERENCE: orange dashed feedback arc, from metrics box
+		%     curving up the right side back into the predictor box ---
+		\coordinate (arc-start) at (b-metric.east);
+		\coordinate (arc-cp1)   at ($(b-metric.east)+(2.2cm,0)$);
+		\coordinate (arc-cp2)   at ($(b-pred.east)+(2.2cm,0)$);
+		\coordinate (arc-end)   at (b-pred.east);
+
+		\draw[grad]
+		(arc-start) .. controls (arc-cp1) and (arc-cp2) .. (arc-end);
+
+		\node[font=\sffamily\footnotesize\bfseries\itshape, text=Caccorange,
+		anchor=west]
+		at ($(arc-cp1)!0.5!(arc-cp2)+(0.1cm,0)$)
+		{gradient of $\mathcal{L}_{\mathrm{TASL}}$};
+	\node[font=\sffamily\scriptsize\itshape, text=Caccorange,
+		anchor=west]
+	at ($(arc-cp1)!0.5!(arc-cp2)+(0.1cm,-0.4cm)$)
+	{through KKT \& $s_\theta$};
+
+	% --- panel title and subtitle ---
+	\node[paneltitle, anchor=south]
+	at ([yshift=18pt]b-pred.north)
+	{(b) Joint Formulation};
+	\node[panelsub, anchor=south]
+	at ([yshift=2pt]b-pred.north)
+	{\textbf{this paper}};
+
+	% --- punch line below panel (b) ---
+	\node[punchline, fill=Cbgyellow, draw=Caccorange, line width=0.6pt,
+	anchor=north]
+	at ([yshift=-12mm]b-metric.south)
+	{Operational signals \textbf{supervise the predictor}.\\[2pt]
+	{\footnotesize Predictor learns where uncertainty matters most\\
+	for downstream safety.}};
+
+	% =====================================================================
+	% Central divider with "vs." marker
+	% =====================================================================
+	\coordinate (div-top) at ($(a-pred.north)!0.5!(b-pred.north)+(0,1.0cm)$);
+	\coordinate (div-bot) at ($(a-metric.south)!0.5!(b-metric.south)+(0,-1.5cm)$);
+
+	\draw[Claneborder, line width=0.4pt, dotted]
+	(div-top) -- (div-bot);
+
+	\node[circle, draw=Cinkblack, fill=white, line width=0.5pt,
+		inner sep=2pt, font=\sffamily\footnotesize\bfseries]
+	at ($(a-pred)!0.5!(b-pred)+(0,-0.7cm)$) {vs.};
+
+\end{tikzpicture}
