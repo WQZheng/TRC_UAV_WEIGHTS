@@ -1,0 +1,4 @@
+BEST: planner alpha=0.1 Hp=15 a_max=20, n=200, seed 12345
+Stage-1   CR=12.5%  minSep=46.3 m  ADE=20.90 m
+Stage-2   CR=11.0%  minSep=47.7 m  ADE=4.32 m
+delta     CR -1.5 pts  minSep +1.4 m  ADE -16.58 m

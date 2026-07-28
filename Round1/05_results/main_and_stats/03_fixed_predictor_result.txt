@@ -1,0 +1,11 @@
+method      : Fixed Stage-1 predictor + CBF-MPC (best planner)
+eval_model  : stage1_full.pt (displacement-only, frozen)
+n / seed    : 200 / 12345
+planner     : {'alpha': 0.1, 'horizon': 15, 'a_max': 20.0}  d_sep=30.0
+eval_range  : 2500-3000 (held-out)
+------------------------------------------------
+CR (%)      : 12.50
+minSep (m)  : 46.34
+ADE (m)     : 20.90
+LeadT (s)   : 0.039
+Energy      : 51.467

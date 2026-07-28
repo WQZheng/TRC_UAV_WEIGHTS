@@ -1,0 +1,11 @@
+method      : Conformal-MPC (calibrated margin) + frozen predictor
+eval_model  : stage1_full.pt (frozen) + conformal-inflated CBF-MPC
+n / seed    : 200 / 12345
+planner     : {'alpha': 0.1, 'horizon': 15, 'a_max': 20.0}  d_sep=30.0
+eval_range  : 2500-3000 (held-out)
+------------------------------------------------
+CR (%)      : 11.50
+minSep (m)  : 48.78
+ADE (m)     : 20.90
+LeadT (s)   : 0.034
+Energy      : 57.934

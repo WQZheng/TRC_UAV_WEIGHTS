@@ -1,0 +1,9 @@
+INDEPENDENT-STREAM planner sweep on stage2_final.pt, held-out 2500-3000, n=200, VAL_SEED=999
+
+config                            CR%     minSep
+alpha0.4 Hp8  amax10             26.0       34.4
+alpha0.2 Hp8  amax10             26.0       35.7
+alpha0.1 Hp8  amax10             26.0       36.0
+alpha0.2 Hp12 amax10             28.0       34.0
+alpha0.2 Hp12 amax16             18.0       42.2
+alpha0.1 Hp15 amax20             12.0       48.5

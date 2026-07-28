@@ -1,0 +1,4 @@
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")

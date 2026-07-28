@@ -1,0 +1,25 @@
+{
+  "method": "Vanilla-MPC (no CBF) + PlanGrad predictor",
+  "eval_model": "stage2_final.pt (predictor); Vanilla-MPC planner",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 41.0,
+    "minSep_m": 29.84171437373633,
+    "ADE_m": 4.321184706484628,
+    "LeadT_s": 0.06599999999999998,
+    "Energy": 19.109322465926894,
+    "n": 200
+  },
+  "w_rep": 50.0
+}

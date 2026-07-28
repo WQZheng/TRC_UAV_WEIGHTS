@@ -1,0 +1,22 @@
+==============================================================================
+DETECTION-HORIZON (LEAD-TIME) SWEEP
+Tuned CBF-MPC (alpha=0.1 Hp=15 a_max=20 d_sep=30), n=200 seed=12345
+CPA placed at t_cpa = horizon/dt steps; geometry otherwise fixed.
+Conflict = min separation < 30 m. Oracle = true neighbour future.
+==============================================================================
+ horiz |   S1 CR%   S2 CR%  Oracle% | attribution of S2 conflicts
+    1s |     86.0     82.5     82.0 | of 165 S2-conflicts: 98% actuation-limited, 2% prediction-limited
+    2s |     13.0     11.0     11.0 | of 22 S2-conflicts: 95% actuation-limited, 5% prediction-limited
+    3s |      1.5      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+    6s |     12.0      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+   10s |      0.5      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+   20s |      0.0      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+==============================================================================
+READING GUIDE
+ - Oracle% is the best achievable CR at each horizon (perfect prediction).
+ - If Oracle% ~ S2% at short horizon, prediction has NO leverage there
+   (authority-bound). If Oracle% << S2% at long horizon, better prediction
+   WOULD reduce conflicts -> prediction regains leverage with lead time.
+ - 'prediction-limited' fraction = share of PlanGrad conflicts an oracle
+   predictor would have avoided at that detection horizon.
+==============================================================================

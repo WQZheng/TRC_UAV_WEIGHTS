@@ -1,0 +1,87 @@
+#### Stage-2 seed 1 ####
+device = cuda
+loaded Stage-1 weights from stage1_full.pt
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+
+step | loss | mean_min_sep(m) | soft_coll | energy | lead | ade
+   1 |   0.292 |   24.53 | 0.165 | 16.06 | 0.835 | ade=0.198
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+   5 |   0.236 |   26.68 | 0.160 | 12.73 | 0.840 | ade=0.192
+  10 |   0.143 |   28.01 | 0.129 | 14.19 | 0.871 | ade=0.163
+  15 |  -0.082 |   33.10 | 0.065 | 14.40 | 0.935 | ade=0.137
+  20 |  -0.043 |   32.35 | 0.080 | 13.52 | 0.920 | ade=0.127
+Please consider re-formulating your problem so that it is always solvable or increasing the number of solver iterations.
+  23 | SKIP (solver issue: SolverError)
+Please consider re-formulating your problem so that it is always solvable or increasing the number of solver iterations.
+  24 | SKIP (solver issue: SolverError)
+  25 |   0.066 |   30.37 | 0.108 | 14.98 | 0.892 | ade=0.086
+  30 |  -0.098 |   33.66 | 0.059 | 15.57 | 0.941 | ade=0.091
+  35 |  -0.043 |   34.45 | 0.074 | 15.51 | 0.926 | ade=0.083
+  40 |   0.131 |   29.70 | 0.125 | 15.52 | 0.875 | ade=0.076
+  45 |  -0.162 |   36.76 | 0.035 | 17.38 | 0.965 | ade=0.071
+Please consider re-formulating your problem so that it is always solvable or increasing the number of solver iterations.
+  48 | SKIP (solver issue: SolverError)
+  50 |   0.433 |   38.24 | 0.057 | 68.57 | 0.943 | ade=0.058
+  55 |  -0.108 |   36.73 | 0.050 | 17.24 | 0.950 | ade=0.083
+  60 |  -0.094 |   34.85 | 0.051 | 17.81 | 0.949 | ade=0.106
+  65 |  -0.077 |   35.41 | 0.057 | 18.13 | 0.943 | ade=0.080
+  70 |  -0.129 |   38.76 | 0.038 | 19.28 | 0.962 | ade=0.067
+
+saved Stage-2 predictor -> stage2_seed1.pt
+#### Stage-2 seed 2 ####
+device = cuda
+loaded Stage-1 weights from stage1_full.pt
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+
+step | loss | mean_min_sep(m) | soft_coll | energy | lead | ade
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+   1 |   0.157 |   27.93 | 0.134 | 13.59 | 0.866 | ade=0.201
+   5 |   0.029 |   30.81 | 0.095 | 14.33 | 0.905 | ade=0.205
+  10 |   0.138 |   28.80 | 0.133 | 12.40 | 0.867 | ade=0.178
+  15 |   0.226 |   28.45 | 0.148 | 16.17 | 0.852 | ade=0.147
+  20 |  -0.119 |   34.85 | 0.054 | 14.53 | 0.946 | ade=0.143
+  25 |  -0.091 |   34.60 | 0.060 | 15.07 | 0.940 | ade=0.132
+  30 |   0.013 |   32.55 | 0.084 | 17.28 | 0.916 | ade=0.118
+  35 |   0.028 |   32.70 | 0.090 | 16.71 | 0.910 | ade=0.092
+  40 |  -0.013 |   38.22 | 0.077 | 16.73 | 0.923 | ade=0.121
+  45 |  -0.159 |   36.98 | 0.037 | 16.74 | 0.963 | ade=0.065
+  50 |  -0.063 |   36.10 | 0.064 | 17.14 | 0.936 | ade=0.054
+  55 |  -0.203 |   38.57 | 0.027 | 16.44 | 0.973 | ade=0.045
+  60 |  -0.143 |   36.73 | 0.041 | 17.21 | 0.959 | ade=0.040
+  65 |  -0.068 |   35.54 | 0.061 | 18.21 | 0.939 | ade=0.041
+  70 |   0.046 |   31.39 | 0.097 | 16.67 | 0.903 | ade=0.047
+
+saved Stage-2 predictor -> stage2_seed2.pt
+#### Stage-2 seed 3 ####
+device = cuda
+loaded Stage-1 weights from stage1_full.pt
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+
+step | loss | mean_min_sep(m) | soft_coll | energy | lead | ade
+   1 |   0.136 |   28.39 | 0.126 | 14.48 | 0.874 | ade=0.194
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+   5 |   0.042 |   29.80 | 0.100 | 13.78 | 0.900 | ade=0.196
+  10 |   0.090 |   30.24 | 0.120 | 12.29 | 0.880 | ade=0.170
+Please consider re-formulating your problem so that it is always solvable or increasing the number of solver iterations.
+  12 | SKIP (solver issue: SolverError)
+  15 |  -0.003 |   31.65 | 0.089 | 13.90 | 0.911 | ade=0.145
+  20 |   0.069 |   29.38 | 0.116 | 12.19 | 0.884 | ade=0.126
+  25 |  -0.080 |   32.14 | 0.065 | 15.05 | 0.935 | ade=0.103
+  30 |  -0.098 |   34.27 | 0.061 | 14.72 | 0.939 | ade=0.100
+  35 |   0.084 |   30.03 | 0.110 | 15.68 | 0.890 | ade=0.093
+  40 |  -0.101 |   34.25 | 0.057 | 15.48 | 0.943 | ade=0.081
+  45 |   0.024 |   30.92 | 0.095 | 15.26 | 0.905 | ade=0.060
+  50 |  -0.107 |   35.72 | 0.054 | 16.42 | 0.946 | ade=0.063
+  55 |  -0.119 |   35.43 | 0.049 | 17.03 | 0.951 | ade=0.061
+  60 |  -0.093 |   36.54 | 0.054 | 17.77 | 0.946 | ade=0.046
+  65 |  -0.091 |   36.26 | 0.051 | 18.93 | 0.949 | ade=0.050
+  70 |  -0.002 |   32.45 | 0.078 | 18.20 | 0.922 | ade=0.065
+
+saved Stage-2 predictor -> stage2_seed3.pt
+ALL TRAIN DONE

@@ -1,0 +1,39 @@
+RQ4 Sim-OOD wind sweep (n=200, seed=12345, conformal r=18.93 m)
+eta_w: 0.5=nominal(~Sim-Base), 1.0/1.5=Sim-OOD
+======================================================================
+
+PlanGrad (ours)  [stage2_final + CBF-MPC]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    11.5     47.8   0.037    4.32     52.4
+    1.0    11.5     47.8   0.037    4.32     52.4
+    1.5    11.5     47.8   0.039    4.32     52.5
+
+Conformal-MPC  [stage1 + conformal CBF]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    11.5     48.8   0.034   20.90     58.0
+    1.0    11.5     48.8   0.034   20.90     58.0
+    1.5    11.5     48.8   0.034   20.90     58.0
+
+Fixed-Predictor  [stage1 + CBF-MPC]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    12.0     46.4   0.039   20.90     51.6
+    1.0    11.5     46.4   0.039   20.90     51.5
+    1.5    12.0     46.3   0.039   20.90     51.5
+
+Constant-Velocity  [CV + CBF-MPC]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    12.0     47.8   0.037    0.83     52.7
+    1.0    12.0     47.8   0.037    0.83     52.8
+    1.5    11.5     47.8   0.038    0.83     52.7
+
+Vanilla-MPC  [stage2 + soft (no CBF)]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    40.0     29.9   0.066    4.32     19.1
+    1.0    40.5     29.8   0.067    4.32     19.1
+    1.5    40.0     29.9   0.067    4.32     19.2
+
+Soft-IPP  [soft_joint + soft]
+    eta     CR%   minSep   LeadT     ADE   Energy
+    0.5    51.5     29.1   0.078    6.45     17.0
+    1.0    51.5     29.1   0.084    6.45     17.0
+    1.5    52.0     29.1   0.087    6.45     17.0

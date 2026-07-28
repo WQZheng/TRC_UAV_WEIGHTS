@@ -1,0 +1,83 @@
+==============================================================================
+MODEL-MISMATCH EVALUATION  (controller = nominal DEFAULT_PARAMS,
+plant = perturbed).  Held-out GUAM 2500-3000, n=200, seed 12345.
+Planner: alpha=0.1 Hp=15 a_max=20, d_sep=30 m.
+CR=conflict rate %%, MinSep=mean min separation m, ADE=m.
+==============================================================================
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+
+### nominal (matched model)
+  Stage-1 +CBF : CR= 12.5%  MinSep= 46.3 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 11.0%  MinSep= 47.7 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 41.0%  MinSep= 29.8 m  (Vanilla)
+  -> CBF safety edge: CR  41.0% (no-CBF) vs  11.0% (CBF); MinSep +17.9 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 11.0% vs 12.5%
+
+### mass +20% (heavy)
+  Stage-1 +CBF : CR= 18.5%  MinSep= 41.3 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 17.5%  MinSep= 42.7 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 75.0%  MinSep= 27.2 m  (Vanilla)
+  -> CBF safety edge: CR  75.0% (no-CBF) vs  17.5% (CBF); MinSep +15.4 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 17.5% vs 18.5%
+
+### mass -15% (light)
+  Stage-1 +CBF : CR= 10.0%  MinSep= 50.6 m  ADE= 20.90 m
+  Stage-2 +CBF : CR=  9.0%  MinSep= 52.1 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 19.5%  MinSep= 31.7 m  (Vanilla)
+  -> CBF safety edge: CR  19.5% (no-CBF) vs   9.0% (CBF); MinSep +20.4 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 9.0% vs 10.0%
+
+### inertia +30%
+  Stage-1 +CBF : CR= 12.0%  MinSep= 45.9 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 12.0%  MinSep= 47.2 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 42.5%  MinSep= 29.6 m  (Vanilla)
+  -> CBF safety edge: CR  42.5% (no-CBF) vs  12.0% (CBF); MinSep +17.6 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 12.0% vs 12.0%
+
+### thrust eff 0.85
+  Stage-1 +CBF : CR= 18.5%  MinSep= 42.0 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 16.5%  MinSep= 43.5 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 68.5%  MinSep= 27.7 m  (Vanilla)
+  -> CBF safety edge: CR  68.5% (no-CBF) vs  16.5% (CBF); MinSep +15.8 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 16.5% vs 18.5%
+
+### actuator delay 1 step
+  Stage-1 +CBF : CR= 22.0%  MinSep= 40.9 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 18.5%  MinSep= 43.2 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 54.0%  MinSep= 28.2 m  (Vanilla)
+  -> CBF safety edge: CR  54.0% (no-CBF) vs  18.5% (CBF); MinSep +15.1 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 18.5% vs 22.0%
+
+### actuator delay 2 steps
+  Stage-1 +CBF : CR= 34.0%  MinSep= 34.5 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 28.0%  MinSep= 37.2 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 87.5%  MinSep= 24.8 m  (Vanilla)
+  -> CBF safety edge: CR  87.5% (no-CBF) vs  28.0% (CBF); MinSep +12.4 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 28.0% vs 34.0%
+
+### wind shift (eta 1.0, gust 5)
+  Stage-1 +CBF : CR= 12.0%  MinSep= 46.4 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 11.0%  MinSep= 47.7 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 39.5%  MinSep= 29.8 m  (Vanilla)
+  -> CBF safety edge: CR  39.5% (no-CBF) vs  11.0% (CBF); MinSep +17.9 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 11.0% vs 12.0%
+
+### combined (m+20%,eff.85,delay1,wind
+  Stage-1 +CBF : CR= 40.0%  MinSep= 31.6 m  ADE= 20.90 m
+  Stage-2 +CBF : CR= 30.0%  MinSep= 33.7 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 94.5%  MinSep= 21.7 m  (Vanilla)
+  -> CBF safety edge: CR  94.5% (no-CBF) vs  30.0% (CBF); MinSep +12.1 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 20.90 m at CR 30.0% vs 40.0%
+
+==============================================================================
+READING GUIDE
+ Q1 (decoupling): compare Stage-1 vs Stage-2 rows. If Stage-2 keeps a
+    much lower ADE while CR stays comparable, the ADE<->safety
+    decoupling survives the mismatch.
+ Q2 (CBF edge):  compare '+CBF' vs 'NO-CBF' CR. A large gap that
+    persists across regimes shows the certificate's safety advantage
+    is robust to model mismatch, not an artefact of a perfect model.
+==============================================================================

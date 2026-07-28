@@ -1,0 +1,36 @@
+{
+  "method": "Conformal-MPC (calibrated margin) + frozen predictor",
+  "eval_model": "stage1_full.pt (frozen) + conformal-inflated CBF-MPC",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 11.5,
+    "minSep_m": 48.79959984162078,
+    "ADE_m": 20.896425985018112,
+    "LeadT_s": 0.034000000000000016,
+    "Energy": 58.134976321536485,
+    "n": 200
+  },
+  "r_conf_m": 18.93201805200722,
+  "delta": 0.1,
+  "d_sep_planning": 48.93201805200722,
+  "calib": {
+    "n_scores": 3000,
+    "delta": 0.1,
+    "q_level": 0.9003333333333333,
+    "calib_range": "2500-2999",
+    "calib_seed": 777,
+    "mean_score": 11.195933636753873,
+    "max_score": 146.0606598178336
+  }
+}

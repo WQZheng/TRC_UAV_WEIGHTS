@@ -1,0 +1,49 @@
+==============================================================================
+MARKET-PENETRATION SWEEP  (fixed demand, vary equipped fraction p)
+arrival=0.16/step/end, horizon=400, warmup=100, reps=6, K=3, seed=12345
+Equipped = PlanGrad-UAV (predictor+CBF-MPC); Unequipped = ORCA.
+CR = per-agent conflict rate %%; Thr = passes/min; Delay = s.
+==============================================================================
+/data/lab/plangrad/plangrad_sim/run_penetration.py:37: RuntimeWarning: Mean of empty slice
+  return (np.nanmean(v), np.nanstd(v), np.nanmean(t), np.nanmean(d),
+/usr/local/lib/python3.10/dist-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+### p = 0% equipped
+  ALL        : CR= 50.3+- 5.6%  Thr=44.83/min  Delay=  6.5s  (n=269)
+  EQUIPPED   : CR=  nan+- nan%  Thr=  nan/min  Delay=  nans  (n=0)
+  UNEQUIPPED : CR= 50.3+- 5.6%  Thr=44.83/min  Delay=  6.5s  (n=269)
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/cvxpy/problems/problem.py:1539: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+  warnings.warn(
+
+### p = 25% equipped
+  ALL        : CR= 57.2+- 3.5%  Thr=44.83/min  Delay=  4.3s  (n=273)
+  EQUIPPED   : CR= 49.8+- 8.0%  Thr=13.33/min  Delay=  1.3s  (n=84)
+  UNEQUIPPED : CR= 59.7+- 4.9%  Thr=31.50/min  Delay=  5.6s  (n=189)
+
+### p = 50% equipped
+  ALL        : CR= 53.3+- 6.7%  Thr=45.33/min  Delay=  3.9s  (n=284)
+  EQUIPPED   : CR= 55.8+- 7.4%  Thr=19.33/min  Delay=  1.7s  (n=128)
+  UNEQUIPPED : CR= 51.7+-11.3%  Thr=26.00/min  Delay=  5.5s  (n=156)
+
+### p = 75% equipped
+  ALL        : CR= 52.1+- 5.4%  Thr=46.83/min  Delay=  3.0s  (n=294)
+  EQUIPPED   : CR= 51.2+- 5.6%  Thr=34.50/min  Delay=  2.4s  (n=220)
+  UNEQUIPPED : CR= 53.7+-12.8%  Thr=12.33/min  Delay=  4.4s  (n=74)
+
+### p = 100% equipped
+  ALL        : CR= 47.7+-12.2%  Thr=47.67/min  Delay=  2.6s  (n=311)
+  EQUIPPED   : CR= 47.7+-12.2%  Thr=47.67/min  Delay=  2.6s  (n=311)
+  UNEQUIPPED : CR=  nan+- nan%  Thr=  nan/min  Delay=  nans  (n=0)
+
+==============================================================================
+READING GUIDE
+ System safety : ALL conflict rate vs p (does equipping the fleet make
+   the whole corridor safer, and is the relation monotone?).
+ Externality   : UNEQUIPPED conflict rate vs p. If it falls as p rises,
+   equipped aircraft confer a POSITIVE externality on unequipped ones.
+ Throughput    : ALL / group throughput and delay vs p (is safety
+   bought at a throughput cost, or are both improved?).
+==============================================================================

@@ -1,0 +1,21 @@
+% Standalone compile wrapper for figure4_iso_vs_joint.tex
+\documentclass[border=10pt,multi,tikz]{standalone}
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  shapes.geometric,
+  calc,
+  fit,
+  backgrounds,
+}
+
+\pgfdeclarelayer{background}
+\pgfsetlayers{background,main}
+
+\begin{document}
+\input{figures/figure4_iso_vs_joint}
+\end{document}

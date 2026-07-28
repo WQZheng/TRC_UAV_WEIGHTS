@@ -1,0 +1,19 @@
+==============================================================================
+MARKET-PENETRATION SWEEP  (fixed demand, vary equipped fraction p)
+arrival=0.25/step/end, horizon=400, warmup=100, reps=1, K=3, seed=12345
+Equipped = PlanGrad-UAV (predictor+CBF-MPC); Unequipped = ORCA.
+CR = per-agent conflict rate %%; Thr = passes/min; Delay = s.
+==============================================================================
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/data/lab/plangrad/plangrad_sim/run_penetration.py:37: RuntimeWarning: Mean of empty slice
+  return (np.nanmean(v), np.nanstd(v), np.nanmean(t), np.nanmean(d),
+/usr/local/lib/python3.10/dist-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+### p = 0% equipped
+  ALL        : CR= 60.0+- 0.0%  Thr=55.00/min  Delay=  7.1s  (n=55)
+  EQUIPPED   : CR=  nan+- nan%  Thr=  nan/min  Delay=  nans  (n=0)
+  UNEQUIPPED : CR= 60.0+- 0.0%  Thr=55.00/min  Delay=  7.1s  (n=55)
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")

@@ -1,0 +1,15 @@
+==============================================================================
+DETECTION-HORIZON (LEAD-TIME) SWEEP
+Tuned CBF-MPC (alpha=0.1 Hp=15 a_max=20 d_sep=30), n=200 seed=12345
+CPA placed at t_cpa = horizon/dt steps; geometry otherwise fixed.
+Conflict = min separation < 30 m. Oracle = true neighbour future.
+==============================================================================
+ horiz |   S1 CR%   S2 CR%  Oracle% | attribution of S2 conflicts
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/cvxpy/problems/problem.py:1539: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+  warnings.warn(
+    4s |      7.0      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+    5s |     10.0      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+    6s |     12.0      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited
+    7s |      8.5      0.0      0.0 | of 0 S2-conflicts: 0% actuation-limited, 0% prediction-limited

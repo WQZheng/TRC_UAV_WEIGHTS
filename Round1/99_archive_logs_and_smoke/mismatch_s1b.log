@@ -1,0 +1,17 @@
+==============================================================================
+MODEL-MISMATCH EVALUATION  (controller = nominal DEFAULT_PARAMS,
+plant = perturbed).  Held-out GUAM 2500-3000, n=200, seed 12345.
+Planner: alpha=0.1 Hp=15 a_max=20, d_sep=30 m.
+CR=conflict rate %%, MinSep=mean min separation m, ADE=m.
+==============================================================================
+/usr/local/lib/python3.10/dist-packages/cvxpy/reductions/solvers/solving_chain_utils.py:41: UserWarning: The problem has an expression with dimension greater than 2. Defaulting to the SCIPY backend for canonicalization.
+  warnings.warn(UserWarning(
+/usr/local/lib/python3.10/dist-packages/diffcp/cone_program.py:442: UserWarning: Solved/Inaccurate.
+  warnings.warn("Solved/Inaccurate.")
+
+### nominal (matched model)
+  Stage-1 +CBF : CR= 11.5%  MinSep= 47.8 m  ADE=  1.84 m
+  Stage-2 +CBF : CR= 11.0%  MinSep= 47.7 m  ADE=  4.32 m
+  Stage-2 NO-CBF: CR= 41.0%  MinSep= 29.8 m  (Vanilla)
+  -> CBF safety edge: CR  41.0% (no-CBF) vs  11.0% (CBF); MinSep +17.9 m
+  -> decoupling: Stage-2 ADE 4.32 m vs Stage-1 1.84 m at CR 11.0% vs 11.5%
