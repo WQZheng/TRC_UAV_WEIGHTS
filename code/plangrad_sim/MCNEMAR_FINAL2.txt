@@ -1,0 +1,13 @@
+MCNEMAR FINAL2 (loose planner: CBF-MPC alpha=0.4 a_max=10 Hp=8,
+  T=20 dt=0.2 eta_w=0.3 d_sep=30; held-out 2500-3000, seed=12345, n=200)
+
+Stage-1 CR = 56.5%   Stage-2 CR = 28.5%   delta = -28.0 pts
+
+Paired 2x2 (rows S1, cols S2):
+                 S2 conflict   S2 safe
+  S1 conflict          57          56
+  S1 safe               0          87
+
+discordant: b (S1-conflict/S2-safe) = 56,  c (S1-safe/S2-conflict) = 0
+McNemar exact two-sided p = 2.776e-17
+  -> p < 0.001: gain under the loose certificate is significant.
