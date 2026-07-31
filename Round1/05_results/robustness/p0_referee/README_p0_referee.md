@@ -251,6 +251,50 @@ Per-episode 0/1 vectors serialised to conflict_vectors.npz (reproducible without
 re-running rollouts). Files: STATS_COCHRAN.txt, stats_tests_cochran.py,
 conflict_vectors.npz.
 
+## Fourth-pass fixes (referee: effort, discard, ORCA clearance, seed dimension)
+
+### [TODO-EFF] matched-pair control effort -- fourth run-time quantity, no increment
+The "no detected increment" enumeration must cover all four run-time quantities
+(conflict, separation, EFFORT, yaw). Effort was the missing one. eff_matched_s1b.py
+recomputes the manuscript's normalised control energy per episode
+(sum_t [((u0-weight)/weight)^2 + ||u_{1:4}/max_body_moment||^2], identical to
+eval_common) on the matched pair (Stage-1b vs Stage-2(final)), deploy config,
+same held-out encounters (paired):
+  Stage-1b (matched control)  effort = 52.8983 +/- 11.8061  (mean +/- SD, n=200)
+  Stage-2  (final)            effort = 52.3487 +/-  7.5702
+  paired diff S2 - S1b = -0.5496, SE=0.5745, 95% CI [-1.6824, +0.5832] (includes 0)
+  -> Stage-2 draws NO measurable extra control effort than the matched control.
+All four run-time quantities now show a paired contrast whose CI includes 0:
+  conflict (Cochran Q p=0.172), separation (-0.04 m [-0.35,+0.27]),
+  effort (-0.55 [-1.68,+0.58]), yaw/max-lateral-offset (+0.52 m [-1.11,+2.14]).
+
+### [TODO-DISC] penetration completion / discard rate per p (survivor-bias audit)
+run_penetration_disc.py adds completion=passed/n and discard=1-completion to the
+existing sweep (CR/Thr/Delay reproduce the SD run point-by-point). An agent is
+discarded if it leaves the corridor (|y|>3*halfwidth) or times out
+(travel_steps>4*free_flow_steps); discarded agents ARE in the CR denominator but
+NOT in throughput/delay (which condition on passing) -- hence the survivor-bias
+caveat this quantifies.
+LOW demand (arrival=0.06): completion by p = 99.1 / 97.4 / 91.5 / 89.2 / 90.2 %
+  (discard 0.9 / 2.6 / 8.5 / 10.8 / 9.8 %). Discard rises with p but peaks ~11%.
+  (HIGH demand arrival=0.16 rerun in progress; PENETRATION_DISC.txt appended on完成.)
+
+### [CHECK-ORCA] pairwise clearance = 30 m (combined-disc), NOT 60 m
+orca_baseline.py: self.radius = d_sep/2 = 15 m per agent, and the collision test
+uses comb_r = 2*radius = d_sep = 30 m (lines 41/57/60/65/154). So the ORCA
+minimum PAIRWISE separation (centre-to-centre) is 30 m -- exactly the same
+clearance the CBF-MPC arm enforces (d_sep=30). The "same pairwise clearance"
+sentence STANDS; radius=15 is the per-agent disc, not the pairwise clearance.
+
+### [CHECK-P] seed formula: p is a FRACTION (0-1), not a percent
+run_penetration_sd.py L57: ps = [int(x)/100.0 for x in args.ps.split(",")], so
+p in {0.0,0.25,0.50,0.75,1.0}; the seed L78 = base + 1000*rep + int(p*97), giving
+floor(97 p) in {0,24,48,72,97}. If p were read as a percent (25), floor(97*25)
+=2425 -- two orders of magnitude off. Reproducibility text MUST state p in [0,1].
+
+Files: EFF_MATCHED_S1B.txt, eff_matched_s1b.py, PENETRATION_LOW_DISC.txt,
+PENETRATION_DISC.txt (high, on完成), run_penetration_disc.py.
+
 ## Version discipline
 Authoritative source = 05_experiments_results_v3.tex (holds all E/F/P batches).
 v4 is a divergent fork (it reverted the TASL weight placeholders) and is to be

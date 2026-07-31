@@ -1,0 +1,41 @@
+==============================================================================
+MARKET-PENETRATION SWEEP  (fixed demand, vary equipped fraction p)
+arrival=0.06/step/end, horizon=400, warmup=100, reps=6, K=3, seed=12345
+Equipped = PlanGrad-UAV (predictor+CBF-MPC); Unequipped = ORCA.
+CR = per-agent conflict rate %%; Thr = passes/min; Delay = s.
+==============================================================================
+
+### p = 0% equipped
+  ALL        : CR= 34.4+- 7.9%  Thr=18.67+-4.27/min  Delay=  2.9+- 0.9s  (n=113  pass=112  completion=99.1%  discard= 0.9%)
+  EQUIPPED   : CR=  nan+- nan%  Thr=  nan+- nan/min  Delay=  nan+- nans  (n=0  pass=0  completion= nan%  discard= nan%)
+  UNEQUIPPED : CR= 34.4+- 7.9%  Thr=18.67+-4.27/min  Delay=  2.9+- 0.9s  (n=113  pass=112  completion=99.1%  discard= 0.9%)
+
+### p = 25% equipped
+  ALL        : CR= 30.5+-14.1%  Thr=18.50+-1.71/min  Delay=  2.3+- 0.5s  (n=114  pass=111  completion=97.4%  discard= 2.6%)
+  EQUIPPED   : CR= 18.3+-15.1%  Thr= 4.33+-1.11/min  Delay=  1.7+- 0.9s  (n=29  pass=26  completion=89.7%  discard=10.3%)
+  UNEQUIPPED : CR= 34.3+-17.7%  Thr=14.17+-1.77/min  Delay=  2.5+- 0.6s  (n=85  pass=85  completion=100.0%  discard= 0.0%)
+
+### p = 50% equipped
+  ALL        : CR= 36.7+-10.2%  Thr=18.00+-2.83/min  Delay=  3.1+- 0.6s  (n=118  pass=108  completion=91.5%  discard= 8.5%)
+  EQUIPPED   : CR= 30.8+-18.9%  Thr= 6.83+-3.44/min  Delay=  2.1+- 0.6s  (n=51  pass=41  completion=80.4%  discard=19.6%)
+  UNEQUIPPED : CR= 42.7+-13.9%  Thr=11.17+-2.19/min  Delay=  3.6+- 0.7s  (n=67  pass=67  completion=100.0%  discard= 0.0%)
+
+### p = 75% equipped
+  ALL        : CR= 23.2+-16.0%  Thr=15.17+-2.34/min  Delay=  1.6+- 0.9s  (n=102  pass=91  completion=89.2%  discard=10.8%)
+  EQUIPPED   : CR= 20.1+-12.9%  Thr=10.67+-1.89/min  Delay=  1.1+- 1.2s  (n=75  pass=64  completion=85.3%  discard=14.7%)
+  UNEQUIPPED : CR= 29.2+-22.4%  Thr= 4.50+-2.14/min  Delay=  2.4+- 1.5s  (n=27  pass=27  completion=100.0%  discard= 0.0%)
+
+### p = 100% equipped
+  ALL        : CR= 24.3+-14.4%  Thr=16.83+-5.08/min  Delay=  1.4+- 0.5s  (n=112  pass=101  completion=90.2%  discard= 9.8%)
+  EQUIPPED   : CR= 24.3+-14.4%  Thr=16.83+-5.08/min  Delay=  1.4+- 0.5s  (n=112  pass=101  completion=90.2%  discard= 9.8%)
+  UNEQUIPPED : CR=  nan+- nan%  Thr=  nan+- nan/min  Delay=  nan+- nans  (n=0  pass=0  completion= nan%  discard= nan%)
+
+==============================================================================
+READING GUIDE
+ System safety : ALL conflict rate vs p (does equipping the fleet make
+   the whole corridor safer, and is the relation monotone?).
+ Externality   : UNEQUIPPED conflict rate vs p. If it falls as p rises,
+   equipped aircraft confer a POSITIVE externality on unequipped ones.
+ Throughput    : ALL / group throughput and delay vs p (is safety
+   bought at a throughput cost, or are both improved?).
+==============================================================================

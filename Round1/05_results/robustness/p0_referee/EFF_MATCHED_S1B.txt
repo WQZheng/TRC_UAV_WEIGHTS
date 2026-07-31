@@ -1,0 +1,13 @@
+[TODO-EFF] per-episode control EFFORT (normalised energy), matched pair
+  n=200 seed=12345; effort = sum_t (thr_n^2 + ||mom_n||^2), dimensionless
+  deploy config: alpha=0.1 Hp=15 a_max=20 d_sep=30 T=20 dt=0.2 eta_w=0.3
+  matched control = Stage-1b (domain-adaptation only)
+
+  Stage-1b (matched control)  effort = 52.8983 +/- 11.8061
+  Stage-2  (final)            effort = 52.3487 +/- 7.5702
+
+  paired contrast Stage-2(final) - Stage-1b (per-episode effort):
+    mean paired diff = -0.5496   SD=8.1240  SE=0.5745  t_crit(0.975,df=199)=1.972
+    95% CI = [-1.6824, +0.5832]
+    -> CI includes 0: Stage-2 draws NO measurable extra control effort
+       than the matched control Stage-1b.
