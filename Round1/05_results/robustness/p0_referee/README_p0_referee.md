@@ -201,6 +201,26 @@ conflict=any pair below d_sep at any tick; reps=6; warmup=100; horizon=400 steps
   3. penetration Thr/Delay SD: see above (LOW done; HIGH appended on完成).
   4. S1b MAX lateral offset = 103.02 +/- 16.84 m (see DEV corrected).
 
+## [TODO-Q] omnibus test -- "among the arms" claim LICENSED
+The RQ1 claim "no CBF-equipped method is best AMONG THE ARMS" is a GLOBAL,
+all-arms statement; STATS.txt only ran three PAIRWISE McNemar edges (PlanGrad vs
+each other arm) and never an omnibus test or the three remaining edges.
+stats_tests_cochran.py reuses the STATS.txt harness verbatim (same held-out
+encounters, seed 12345, n=200, deploy planner alpha=0.1/Hp=15/a_max=20,
+conflict = per-episode min-sep < 30 m; CR reproduces STATS.txt exactly:
+PlanGrad 11.0 / Conformal 11.5 / Fixed 12.5 / CV 12.0) and adds:
+  Cochran's Q (omnibus, H0 = all four arms equal): Q=4.2857, df=3, p=0.232 (n.s.)
+  All 6 exact McNemar edges, Holm-Bonferroni: EVERY edge n.s. (Holm=1.000),
+    including the three never-tested edges Conformal-Fixed (p=0.500),
+    Conformal-CV (p=1.000), Fixed-CV (p=1.000).
+  -> omnibus null NOT rejected + all corrected pairwise edges n.s. => the four
+     CBF-equipped arms are JOINTLY indistinguishable on conflict rate. The global
+     "among the arms ... statistically indistinguishable" wording is LICENSED and
+     may be restored from the narrowed "three prespecified contrasts" fallback.
+Per-episode 0/1 vectors serialised to conflict_vectors.npz (reproducible without
+re-running rollouts). Files: STATS_COCHRAN.txt, stats_tests_cochran.py,
+conflict_vectors.npz.
+
 ## Version discipline
 Authoritative source = 05_experiments_results_v3.tex (holds all E/F/P batches).
 v4 is a divergent fork (it reverted the TASL weight placeholders) and is to be

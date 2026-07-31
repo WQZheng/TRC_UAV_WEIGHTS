@@ -1,0 +1,25 @@
+==========================================================================
+[TODO-Q] OMNIBUS + ALL-PAIRS SAFETY TESTS  (n=200, seed=12345,
+  deploy planner alpha=0.1/Hp=15/a_max=20, identical held-out 2500-3000)
+conflict = per-episode min sep < 30 m.  (numbers match STATS.txt)
+==========================================================================
+method                   CR %   Wilson 95% CI         
+PlanGrad                11.0   [  7.4,  16.1]
+Conformal-MPC           11.5   [  7.8,  16.7]
+Fixed-Predictor         12.5   [  8.6,  17.8]
+Constant-Velocity       12.0   [  8.2,  17.2]
+
+Cochran's Q (omnibus, H0: all four arms equal conflict propensity):
+  Q = 4.2857   df = 3   p = 0.2322   -> n.s. (arms indistinguishable)
+
+All C(4,2)=6 exact McNemar edges (Holm-Bonferroni corrected):
+  PlanGrad vs Conformal-MPC                disc(2/1)  p=1.000  Holm=1.000  -> n.s.
+  PlanGrad vs Fixed-Predictor              disc(3/0)  p=0.250  Holm=1.000  -> n.s.
+  PlanGrad vs Constant-Velocity            disc(2/0)  p=0.500  Holm=1.000  -> n.s.
+  Conformal-MPC vs Fixed-Predictor         disc(2/0)  p=0.500  Holm=1.000  -> n.s.
+  Conformal-MPC vs Constant-Velocity       disc(2/1)  p=1.000  Holm=1.000  -> n.s.
+  Fixed-Predictor vs Constant-Velocity     disc(0/1)  p=1.000  Holm=1.000  -> n.s.
+
+VERDICT: Cochran's Q p=0.232 (n.s.) and all six Holm-corrected pairwise
+  edges n.s. => the four CBF-equipped arms are JOINTLY indistinguishable
+  on conflict rate; the global 'among the arms' claim is LICENSED.
