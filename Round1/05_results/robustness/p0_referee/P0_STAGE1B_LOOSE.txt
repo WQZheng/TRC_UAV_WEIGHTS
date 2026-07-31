@@ -1,0 +1,23 @@
+P0-1  Stage-1b under LOOSE config (referee #10 control)
+  CBF-MPC alpha=0.4 a_max=10 Hp=8, T=20 dt=0.2 eta_w=0.3 d_sep=30,
+  held-out 2500-3000, seed=12345, n=200
+
+THREE-POINT CR (loose config):
+  Stage-1  (no adapt, no signal) CR = 56.5%
+  Stage-1b (adapt,   no signal)  CR = 56.0%
+  Stage-2  (adapt +  signal)     CR = 28.5%
+
+  gap S1 -> S1b (data adaptation)      = -0.5 pts
+  gap S1b -> S2 (planner-info signal)  = -27.5 pts
+  total S1 -> S2                       = -28.0 pts
+  share of total gap explained by adaptation alone = 2%
+
+Paired 2x2 loose (rows S1b, cols S2):
+                 S2 conflict   S2 safe
+  S1b conflict         57          55
+  S1b safe              0          88
+discordant: b(S1b-conf/S2-safe)=55  c(S1b-safe/S2-conf)=0
+McNemar exact two-sided p(S1b vs S2, loose) = 5.551e-17
+
+READ: S1b closer to S1  -> adaptation alone does NOT close gap;
+      planner-informative signal regains leverage. 5.5 STANDS.

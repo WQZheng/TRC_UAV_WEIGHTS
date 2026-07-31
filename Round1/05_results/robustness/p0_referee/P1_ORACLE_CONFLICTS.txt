@@ -1,0 +1,42 @@
+P1 ORACLE CONFLICT ATTRIBUTION (referee #4)
+  deploy config: CBF-MPC alpha=0.1 Hp=15 a_max=20 d_sep=30,
+  T=20 dt=0.2 eta_w=0.3, held-out 2500-3000, seed=12345, n=200
+
+Stage-2 (real predictor) CR = 11.0%  (22/200 episodes conflict)
+Oracle  (perfect future) CR = 12.0%  (24/200 episodes conflict)
+
+Per-conflict-episode attribution (22 Stage-2 conflicts):
+  epi | S2 minSep | Oracle minSep | Oracle slack@CPA | class
+   36 |    17.16 |       16.03 |         1.9809 | A actuation-limited (oracle also conflicts)
+   40 |    28.08 |       27.12 |         1.3415 | A actuation-limited (oracle also conflicts)
+   42 |    29.07 |       28.07 |         1.9931 | A actuation-limited (oracle also conflicts)
+   65 |    25.94 |       26.57 |         2.2280 | A actuation-limited (oracle also conflicts)
+   69 |    20.63 |       19.94 |         3.8189 | A actuation-limited (oracle also conflicts)
+   70 |    25.43 |       24.81 |         2.2719 | A actuation-limited (oracle also conflicts)
+   76 |    22.66 |       21.68 |         2.3672 | A actuation-limited (oracle also conflicts)
+   77 |    24.95 |       24.03 |         3.7242 | A actuation-limited (oracle also conflicts)
+   81 |    19.95 |       19.46 |         2.5335 | A actuation-limited (oracle also conflicts)
+   85 |    10.89 |       11.07 |         5.2901 | A actuation-limited (oracle also conflicts)
+   97 |    20.92 |       20.70 |         1.7517 | A actuation-limited (oracle also conflicts)
+  117 |    26.82 |       26.71 |         0.0000 | A actuation-limited (oracle also conflicts)
+  121 |    26.37 |       26.07 |         3.1868 | A actuation-limited (oracle also conflicts)
+  131 |    19.48 |       18.73 |         4.0439 | A actuation-limited (oracle also conflicts)
+  139 |    23.96 |       23.90 |         1.7750 | A actuation-limited (oracle also conflicts)
+  140 |    22.46 |       21.86 |         2.6427 | A actuation-limited (oracle also conflicts)
+  155 |    19.32 |       19.96 |         3.1887 | A actuation-limited (oracle also conflicts)
+  158 |    23.81 |       23.18 |         4.0428 | A actuation-limited (oracle also conflicts)
+  167 |    20.92 |       20.36 |         3.9552 | A actuation-limited (oracle also conflicts)
+  174 |    25.00 |       24.36 |         3.0476 | A actuation-limited (oracle also conflicts)
+  176 |    28.34 |       29.66 |         0.0000 | A actuation-limited (oracle also conflicts)
+  179 |    23.50 |       23.12 |         2.4217 | A actuation-limited (oracle also conflicts)
+
+SUMMARY of the 22 Stage-2 conflict episodes:
+  (A) actuation-limited / hard-infeasible under any prediction = 22
+  (B) prediction-induced (oracle avoids)                       = 0
+
+READ: every Stage-2 conflict ALSO occurs under a perfect predictor.
+      => hard-infeasible under the realized prediction stream; a
+         better predictor would NOT have changed the outcome. This
+         is the clean episode-level evidence for #4 (the leadtime 2s
+         Oracle=Stage-2=11.0%% row is a population-level corroboration
+         under a fixed-CPA controlled setting, NOT a substitute).

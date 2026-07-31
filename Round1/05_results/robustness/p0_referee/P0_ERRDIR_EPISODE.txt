@@ -1,0 +1,28 @@
+P0-2  EPISODE-LEVEL directional error + paired test (referee #7b)
+  n=200 seed=12345, critical window |idx-CPA|<=3 (model-independent)
+  e_par<0 = predicted neighbour CLOSER to ego than truth (conservative)
+
+Stage-1:
+  EPISODE-level e_par: mean=-0.699 m  SEM=0.493 (n_epi=200)  |mean|>2SEM ? NO
+    t = mean/SEM = -1.42   toward-ego frac (episode mean) = 53.8%
+    [contrast] OLD step-level SEM = 0.299 over 1400 steps (understated ~1.6x)
+
+Stage-1b (domain-adapt):
+  EPISODE-level e_par: mean=-0.176 m  SEM=0.239 (n_epi=200)  |mean|>2SEM ? NO
+    t = mean/SEM = -0.74   toward-ego frac (episode mean) = 45.4%
+    [contrast] OLD step-level SEM = 0.121 over 1400 steps (understated ~2.0x)
+
+Stage-2 (TASL):
+  EPISODE-level e_par: mean=-0.340 m  SEM=0.235 (n_epi=200)  |mean|>2SEM ? NO
+    t = mean/SEM = -1.45   toward-ego frac (episode mean) = 54.6%
+    [contrast] OLD step-level SEM = 0.149 over 1400 steps (understated ~1.6x)
+
+=== DIRECT PAIRED TESTS (the never-done e_par(S2)-e_par(S1b)) ===
+PAIRED  Stage-2 (TASL) - Stage-1b (domain-adapt)  (n=200):
+  mean paired diff = -0.164 m   paired-t: t=-2.71  p=0.007399   Wilcoxon p=0.001137
+  -> SIGNIFICANT at episode level (both t and Wilcoxon < 0.05 ? yes)
+
+PAIRED  Stage-2 (TASL) - Stage-1  (n=200):
+  mean paired diff = +0.359 m   paired-t: t=+0.85  p=0.3991   Wilcoxon p=0.5565
+  -> NOT significant at episode level (both t and Wilcoxon < 0.05 ? no)
+
