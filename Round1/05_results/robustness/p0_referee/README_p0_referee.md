@@ -295,6 +295,33 @@ floor(97 p) in {0,24,48,72,97}. If p were read as a percent (25), floor(97*25)
 Files: EFF_MATCHED_S1B.txt, eff_matched_s1b.py, PENETRATION_LOW_DISC.txt,
 PENETRATION_DISC.txt (high, on完成), run_penetration_disc.py.
 
+## [TODO-DISC2] discard-cause split + censored-delay sensitivity -- no externality reversal
+Concern (correct arithmetic, wrong premise): if discards were TIMEOUTS, a timed-
+out agent accrues >= (480-120)*0.2 = 72 s of delay; charging p=100's 8% discards
+at that cap gives 0.92*2.6 + 0.08*72 ~ 8.2 s > the p=0 value 6.5 s, i.e. the
+delay externality would REVERSE. This is sufficient to worry ONLY if timeouts
+dominate; if discards are LATERAL exits (|y|>3*halfwidth, pushed sideways by
+avoidance, not "slow") the concern evaporates. So we split the cause.
+penetration_sim_disc2.py tags each discard timeout-vs-lateral and reports a
+censored-delay UPPER bound (passers real + timeouts charged the cap; laterals
+excluded, since a sideways exit is not a slowdown). CR/Thr/Delay/completion
+reproduce the DISC run point-by-point.
+RESULT (both regimes, all p): timeout = 0 at EVERY point; every discard is a
+LATERAL corridor exit.
+  LOW  (arrival=0.06) timeout/lateral by p: 0/1, 0/3, 0/10, 0/11, 0/11.
+  HIGH (arrival=0.16) timeout/lateral by p: 0/0, 0/4, 0/12, 0/13, 0/25.
+  Censored-delay upper bound therefore EQUALS the raw completion delay at every
+  p (LOW 2.9/2.3/3.1/1.6/1.4 s; HIGH 6.5/4.3/3.9/3.0/2.6 s), so the delay still
+  falls monotonically with p: NO externality reversal. Because the cap is never
+  triggered, this is a strict upper bound, not an assumption -- a stronger
+  statement than disclose-only. Manuscript wording: "every discarded agent
+  leaves the corridor laterally (pushed out by avoidance), none times out; even
+  a censored-delay upper bound that charges any timed-out agent the full time cap
+  leaves the delay trend unchanged, so the completion-delay externality does not
+  reverse under survivor-bias correction."
+Files: PENETRATION_LOW_DISC2.txt, PENETRATION_DISC2.txt, run_penetration_disc2.py,
+penetration_sim_disc2.py.
+
 ## Version discipline
 Authoritative source = 05_experiments_results_v3.tex (holds all E/F/P batches).
 v4 is a divergent fork (it reverted the TASL weight placeholders) and is to be
