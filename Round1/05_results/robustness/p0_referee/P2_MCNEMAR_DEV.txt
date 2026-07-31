@@ -1,0 +1,30 @@
+P2  deploy-config McNemar (S1b vs S2) + route deviation (TODO-1BP/DEV)
+  CBF-MPC alpha=0.1 Hp=15 a_max=20 d_sep=30, n=200 seed=12345
+
+  Stage-1           CR= 12.5%  Wilson95=[ 8.6, 17.8]  (25/200)
+  Stage-1b          CR= 11.5%  Wilson95=[ 7.8, 16.7]  (23/200)
+  Stage-2           CR= 11.0%  Wilson95=[ 7.4, 16.1]  (22/200)
+  Stage-2(matched)  CR= 13.5%  Wilson95=[ 9.4, 18.9]  (27/200)
+
+=== [TODO-1BP] deploy-config paired McNemar (per-episode) ===
+  Stage-1b vs Stage-2:
+    2x2 [rows Stage-1b]: both-conf=21  Stage-1b-only=2  Stage-2-only=1  both-safe=176
+    discordant b(Stage-1b-conf/Stage-2-safe)=2  c(Stage-1b-safe/Stage-2-conf)=1  McNemar p=1
+    paired min-sep diff (S2 - Stage-1b) = -0.04 m  95% CI [-0.35, +0.27]
+
+  Stage-1 vs Stage-2:
+    2x2 [rows Stage-1]: both-conf=22  Stage-1-only=3  Stage-2-only=0  both-safe=175
+    discordant b(Stage-1-conf/Stage-2-safe)=3  c(Stage-1-safe/Stage-2-conf)=0  McNemar p=0.25
+    paired min-sep diff (S2 - Stage-1) = +1.41 m  95% CI [+0.59, +2.22]
+
+=== [TODO-DEV] route cross-track deviation (metres) ===
+  reported as mean +/- SD over 200 episodes
+  Stage-1            per-episode MAX xtrack = 99.65 +/- 24.32 m   MEAN xtrack = 45.38 +/- 11.02 m
+  Stage-2            per-episode MAX xtrack = 103.53 +/- 11.27 m   MEAN xtrack = 47.97 +/-  4.47 m
+  Stage-2(matched)   per-episode MAX xtrack = 115.01 +/- 11.15 m   MEAN xtrack = 49.84 +/-  4.10 m
+
+  matched-pair contrast: Stage-2(final) - Stage-2(matched) on MAX xtrack
+    = -11.47 m  95% CI [-13.43, -9.51]
+  Stage-2(final) - Stage-1 on MAX xtrack = +3.88 m  95% CI [+1.26, +6.50]
+  READ: if the matched-pair CI includes 0, Stage-2 does NOT buy behaviour
+        with a larger lateral excursion than its matched control.

@@ -1,0 +1,15 @@
+EMPIRICAL POOLED COVERAGE VALIDATION (referee TODO-COV)
+  frozen predictor stage1_full.pt; eval stream pool 2500-3000 seed 12345
+  nonconformity score s = ||mu_hat(k) - true(k)|| over k<=Hp=15, n_ep=200
+
+  target coverage (1 - delta)          = 90.0%
+  conformal radius r_conf (calibrated) = 18.93 m
+  calibration scores (independent)     = 3000
+  evaluation scores (pooled)           = 3000
+  EMPIRICAL POOLED COVERAGE on eval    = 90.8%
+
+  -> coverage attained (>= target): the conformal buffer is calibrated;
+     enforcing d_sep + r_conf gives the stated marginal guarantee on
+     the held-out evaluation stream.
+
+  [extra] eval score stats: mean=10.83 m  median=10.41 m  p90=18.65 m  max=132.41 m

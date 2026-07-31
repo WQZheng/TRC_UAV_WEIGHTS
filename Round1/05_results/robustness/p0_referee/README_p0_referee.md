@@ -111,6 +111,59 @@ substitute for this episode-level test. Soften "no improvement of the predictor
 could have changed that" -> "hard-infeasible under the realized prediction
 stream".
 
+## Second-pass checklist experiments (TODO-1BH / COV / 1BP / DEV)
+
+All deploy/main-table config (CBF-MPC alpha=0.1, Hp=15, a_max=20, d_sep=30,
+T=20, dt=0.2, eta_w=0.3, n=200, seed=12345, pool 2500-3000), evaluation-only.
+
+### [TODO-1BH] Stage-1b detection-horizon at 1s/2s (was missing from LEADTIME_S1B)
+LEADTIME_S1B.txt only had 3-6s (all 0.0%); the informative rows are 1-2s.
+    python3 eval_leadtime.py --stage1 stage1_full.pt \
+        --stage2 stage1b_domainadapt.pt --horizons 1,2 --out LEADTIME_S1B_1_2.txt
+Result (S2 column = Stage-1b here):
+    1s: S1 86.0 / S1b 83.0 / Oracle 82.0
+    2s: S1 13.0 / S1b 11.5 / Oracle 11.0
+With main LEADTIME.txt (S2 1s=82.5, 2s=11.0) the full 2s matched-control row is
+S1 13.0 / S1b 11.5 / S2 11.0 / Oracle 11.0: at the tactical horizon the matched
+control and the task-aligned predictor are both actuation-bound and sit on the
+oracle. VERDICT: the matched-control leadtime claim is SUPPORTED -> add the
+Stage-1b row to the leadtime table; do NOT delete the claim.
+
+### [TODO-COV] empirical pooled coverage on the evaluation stream
+    python3 cov_validate.py                 # -> COVERAGE_VALID.txt
+Target coverage 90% (delta=0.1), calibrated r_conf=18.93 m (n_calib=3000,
+independent seed 777). Empirical pooled coverage on the eval stream (seed 12345,
+3000 scores) = 90.8% (p90 score 18.65 m ~ r_conf). VERDICT: calibration VALID on
+held-out; report the number in the results chapter (no need to defer to appendix).
+
+### [TODO-1BP] deploy-config paired McNemar Stage-1b vs Stage-2 (from per-episode)
+### [TODO-DEV] route (cross-track) deviation of the matched pair
+    python3 p2_mcnemar_dev.py               # -> P2_MCNEMAR_DEV.txt
+Deploy CR: S1 12.5 / S1b 11.5 / S2 11.0 / S2(matched) 13.5.
+1BP paired (per-episode, NOT inferred from net CR):
+  S1b vs S2: discordant b=2 c=1, McNemar p=1.0; paired min-sep diff
+    (S2 - S1b) = -0.04 m, 95% CI [-0.35, +0.27] (includes 0)
+    -> Stage-1b and Stage-2 statistically indistinguishable under deploy; direct
+       paired evidence for the decoupling / negative joint-training result.
+  S1 vs S2: b=3 c=0, McNemar p=0.25; paired min-sep diff +1.41 m [+0.59,+2.22].
+DEV route cross-track deviation (metres, mean +/- SD over 200 episodes):
+  per-episode MAX xtrack: S1 99.65+/-24.32, S2 103.53+/-11.27,
+    S2(matched) 115.01+/-11.15
+  matched-pair contrast S2(final) - S2(matched) on MAX xtrack = -11.47 m,
+    95% CI [-13.43, -9.51] (excludes 0) -> Stage-2 does NOT buy behaviour with a
+    larger lateral excursion; it is SMALLER than the matched control's. The
+    "yaw-to-buy-performance" concern is refuted.
+  S2(final) - S1 on MAX xtrack = +3.88 m [+1.26,+6.50] (S1 xtrack SD 24.3 m
+    reflects the OOD predictor's erratic manoeuvres).
+
+## Mixed-traffic penetration analogy references (verified CrossRef+OpenAlex)
+For §07 mixed-traffic analogy: peng2025enhancing (2025), wang2024energy (2024),
+hou2023evaluating (2023), mohammed2023vehicle (2023). NOTE the penetration data
+(PENETRATION.txt) show unequipped CR is NOT monotone in p (50.3->59.7->51.7->53.7
+high demand), so any "positive/monotone externality" wording is a FACTUAL error
+and must be removed; report the penetration study descriptively (#11).
+
 Files: P0_STAGE1B_LOOSE.txt, P0_ERRDIR_EPISODE.txt, P1_ORACLE_CONFLICTS.txt,
-loose_minsep.pt (per-episode min-sep S1/S1b/S2 under loose config),
-p0_stage1b_loose.py, p0_errdir_episode.py, p1_oracle_conflicts.py.
+LEADTIME_S1B_1_2.txt, COVERAGE_VALID.txt, P2_MCNEMAR_DEV.txt, loose_minsep.pt,
+p0_stage1b_loose.py, p0_errdir_episode.py, p1_oracle_conflicts.py,
+cov_validate.py, p2_mcnemar_dev.py.
