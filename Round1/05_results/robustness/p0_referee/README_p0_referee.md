@@ -201,7 +201,37 @@ conflict=any pair below d_sep at any tick; reps=6; warmup=100; horizon=400 steps
   3. penetration Thr/Delay SD: see above (LOW done; HIGH appended on完成).
   4. S1b MAX lateral offset = 103.02 +/- 16.84 m (see DEV corrected).
 
-## [TODO-Q] omnibus test -- "among the arms" claim LICENSED
+## [TODO-Q2] omnibus test on the CORRECT arm set -- "among the arms" LICENSED
+The global claim is about the four arms that share ONE deploy planner:
+{PlanGrad, Stage-1b, Fixed-Predictor, Constant-Velocity}. The first Cochran run
+[TODO-Q] used the WRONG set (it included Conformal-MPC, which changes the planner
+threshold d_sep+r_conf and was removed from the fixed-planner ranking, and it
+OMITTED Stage-1b). stats_tests_cochran_q2.py fixes the set: it reuses the
+PG/Fixed/CV per-episode vectors from conflict_vectors.npz and recomputes the
+Stage-1b vector with the deploy rollout of p2_mcnemar_dev.py verbatim
+(stage1b_domainadapt.pt, Hp=15/d_sep=30/T=20/dt=0.2/eta_w=0.3/batch=8), which
+reproduces the P2 result Stage-1b CR = 11.5% (23/200) exactly.
+  CR: PlanGrad 11.0 (22/200) / Stage-1b 11.5 (23/200) / Fixed 12.5 (25/200) /
+      Constant-Velocity 12.0 (24/200).
+  Cochran's Q (omnibus, H0 = four common-planner arms equal): Q=5.000, df=3,
+    p=0.172 (n.s.).
+  All 6 exact McNemar edges, Holm-Bonferroni: EVERY edge n.s. (Holm=1.000),
+    including the two edges the claim needs and Q1 lacked: Stage-1b-Fixed
+    (disc 2/0, p=0.500) and Stage-1b-CV (disc 1/0, p=1.000).
+  -> omnibus null NOT rejected + all corrected pairwise edges n.s. => the four
+     COMMON-PLANNER arms are JOINTLY indistinguishable on conflict rate; the
+     global "among the arms ... statistically indistinguishable" wording is
+     LICENSED and may be restored from the narrowed "prespecified contrasts".
+Per-episode 0/1 vectors: conflict_vectors_q2.npz (correct set). Files:
+STATS_COCHRAN_Q2.txt, stats_tests_cochran_q2.py, conflict_vectors_q2.npz.
+
+## [TODO-Q] (SUPERSEDED by Q2 -- kept for the secondary Conformal statement)
+The Conformal-inclusive run {PG, Conformal, Fixed, CV} (Q=4.286, df=3, p=0.232,
+all six Holm edges n.s.) does NOT test the fixed-planner claim (wrong arm set),
+but it separately LICENSES a secondary statement: even with the margin baseline
+(Conformal-MPC) included, ALL certificate-equipped arms are jointly
+indistinguishable on conflict rate. Use this as a secondary sentence only, not
+for the primary "among the (common-planner) arms" claim.
 The RQ1 claim "no CBF-equipped method is best AMONG THE ARMS" is a GLOBAL,
 all-arms statement; STATS.txt only ran three PAIRWISE McNemar edges (PlanGrad vs
 each other arm) and never an omnibus test or the three remaining edges.

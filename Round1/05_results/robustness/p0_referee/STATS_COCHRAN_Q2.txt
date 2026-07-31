@@ -1,0 +1,30 @@
+==========================================================================
+[TODO-Q2] OMNIBUS + ALL-PAIRS SAFETY TESTS -- CORRECT common-planner arm set
+  {PlanGrad, Stage-1b, Fixed-Predictor, Constant-Velocity}  (Conformal
+  EXCLUDED: it changes the planner threshold, not in the fixed-planner set)
+  n=200, seed=12345, deploy planner alpha=0.1/Hp=15/a_max=20, held-out 2500-3000
+  conflict = per-episode min sep < 30 m.
+==========================================================================
+method                   CR %   (k/n)         
+PlanGrad                11.0   (22/200)
+Stage-1b                11.5   (23/200)
+Fixed-Predictor         12.5   (25/200)
+Constant-Velocity       12.0   (24/200)
+
+Cochran's Q (omnibus, H0: all four common-planner arms equal):
+  Q = 5.0000   df = 3   p = 0.1718   -> n.s. (arms indistinguishable)
+
+All C(4,2)=6 exact McNemar edges (Holm-Bonferroni corrected):
+  PlanGrad vs Stage-1b                     disc(2/1)  p=1.000  Holm=1.000  -> n.s.
+  PlanGrad vs Fixed-Predictor              disc(3/0)  p=0.250  Holm=1.000  -> n.s.
+  PlanGrad vs Constant-Velocity            disc(2/0)  p=0.500  Holm=1.000  -> n.s.
+  Stage-1b vs Fixed-Predictor              disc(2/0)  p=0.500  Holm=1.000  -> n.s.
+  Stage-1b vs Constant-Velocity            disc(1/0)  p=1.000  Holm=1.000  -> n.s.
+  Fixed-Predictor vs Constant-Velocity     disc(0/1)  p=1.000  Holm=1.000  -> n.s.
+
+VERDICT: Cochran's Q p=0.172 (n.s.) and all six Holm-corrected pairwise
+  edges n.s. => the four COMMON-PLANNER arms are JOINTLY indistinguishable
+  on conflict rate; the global 'among the arms' claim is LICENSED.
+  (The earlier Conformal-inclusive run separately licenses the secondary
+   statement that ALL certificate-equipped arms, margin baseline included,
+   are jointly indistinguishable.)
