@@ -1,0 +1,11 @@
+[TODO-DEV corrected] maximum lateral offset, TRUE matched pair
+  matched control = Stage-1b (domain adaptation); deploy config,
+  n=200 seed=12345; metric = per-episode MAX lateral offset (NOT Phi_dev)
+
+  Stage-1b (matched control)   MAX lateral offset = 103.02 +/- 16.84 m   MEAN lateral offset = 47.35 +/-  6.97 m
+  Stage-2 (final)              MAX lateral offset = 103.53 +/- 11.27 m   MEAN lateral offset = 47.97 +/-  4.47 m
+
+MATCHED-PAIR contrast (the referee's question):
+  Stage-2(final) - Stage-1b on MAX lateral offset = +0.52 m  95% CI [-1.11, +2.14]
+  -> CI includes 0: Stage-2 does NOT buy behaviour with a larger
+     lateral excursion than the matched control Stage-1b.

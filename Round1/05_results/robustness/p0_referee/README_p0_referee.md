@@ -163,7 +163,53 @@ hou2023evaluating (2023), mohammed2023vehicle (2023). NOTE the penetration data
 high demand), so any "positive/monotone externality" wording is a FACTUAL error
 and must be removed; report the penetration study descriptively (#11).
 
+## Third-pass fixes (referee回执: DEV corrected, penetration SD, recap numbers)
+
+### [DEV corrected] the earlier DEV compared the WRONG control -- fixed here
+The referee打回: "matched control" = Stage-1b throughout the paper, NOT
+stage2_matched.pt. The earlier P2 run reported S2(final) vs S2(matched); that
+belongs in the appendix and must not carry the name "matched control" into 5.4.
+Corrected run (dev_matched_s1b.py, deploy config, same 200 episodes):
+  Stage-1b (matched control)  MAX lateral offset = 103.02 +/- 16.84 m
+  Stage-2  (final)            MAX lateral offset = 103.53 +/- 11.27 m
+  matched-pair S2(final) - S1b = +0.52 m, 95% CI [-1.11, +2.14] (includes 0)
+  -> Stage-2 does NOT buy behaviour with a larger lateral excursion than the
+     matched control Stage-1b; the "yaw-to-buy-performance" concern is refuted.
+  METRIC NAME: this is the per-episode MAXIMUM lateral offset, NOT Phi_dev (the
+  training functional is time-AVERAGED); label the table entry accordingly.
+  tab:stage1b deviation row: S1b 103.02+/-16.84 m, S2 103.53+/-11.27 m.
+The old S2(final)-S2(matched) = -11.47 m contrast is a valid APPENDIX robustness
+observation (config-matched retrain uses a LARGER lateral excursion), but under
+its own name, not "matched control".
+
+### [TODO-PEN] penetration re-run with Thr/Delay SD (run_penetration_sd.py)
+Original PENETRATION*.txt recorded SD only for CR; agg() now also emits
+throughput/delay SD. CR values reproduce the originals exactly.
+LOW demand (arrival=0.06, reps=6, horizon=400, warmup=100, K=3, seed=12345):
+  ALL Thr/Delay by p: 0%=18.67+/-4.27,2.9+/-0.9; 25%=18.50+/-1.71,2.3+/-0.5;
+  50%=18.00+/-2.83,3.1+/-0.6; 75%=15.17+/-2.34,1.6+/-0.9; 100%=16.83+/-5.08,1.4+/-0.5.
+  (HIGH demand arrival=0.16 rerun in progress; PENETRATION_SD.txt appended on完成.)
+Protocol params (both regimes): single bidirectional corridor, two Poisson
+arrival streams, fixed demand across the sweep, equipped=SafePolicy /
+unequipped=ORCA through identical 6-DOF dynamics; K=3 nearest neighbours;
+pass=reach far end; delay=realised-freeflow travel time; throughput=passes/min;
+conflict=any pair below d_sep at any tick; reps=6; warmup=100; horizon=400 steps.
+
+### Recap numbers to the referee
+  1. S1b leadtime: 1s = 83.0% (2s = 11.5%); 7/10/20s not run (table dashes ok).
+  2. COVERAGE n_eval = 3000 pooled evaluation scores (calibration n=3000, indep).
+  3. penetration Thr/Delay SD: see above (LOW done; HIGH appended on完成).
+  4. S1b MAX lateral offset = 103.02 +/- 16.84 m (see DEV corrected).
+
+## Version discipline
+Authoritative source = 05_experiments_results_v3.tex (holds all E/F/P batches).
+v4 is a divergent fork (it reverted the TASL weight placeholders) and is to be
+ABANDONED; do NOT edit v4. All numbers above land in v3, then v4 is diffed for
+any v4-only content and retired.
+
 Files: P0_STAGE1B_LOOSE.txt, P0_ERRDIR_EPISODE.txt, P1_ORACLE_CONFLICTS.txt,
-LEADTIME_S1B_1_2.txt, COVERAGE_VALID.txt, P2_MCNEMAR_DEV.txt, loose_minsep.pt,
-p0_stage1b_loose.py, p0_errdir_episode.py, p1_oracle_conflicts.py,
-cov_validate.py, p2_mcnemar_dev.py.
+LEADTIME_S1B_1_2.txt, COVERAGE_VALID.txt, P2_MCNEMAR_DEV.txt,
+DEV_MATCHED_S1B.txt, PENETRATION_LOW_SD.txt, PENETRATION_SD.txt (high, on完成),
+loose_minsep.pt, p0_stage1b_loose.py, p0_errdir_episode.py,
+p1_oracle_conflicts.py, cov_validate.py, p2_mcnemar_dev.py, dev_matched_s1b.py,
+run_penetration_sd.py, refs_mixedtraffic.bib.
