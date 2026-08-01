@@ -322,6 +322,39 @@ LATERAL corridor exit.
 Files: PENETRATION_LOW_DISC2.txt, PENETRATION_DISC2.txt, run_penetration_disc2.py,
 penetration_sim_disc2.py.
 
+## [CENSOR] right-censoring audit -- no silently dropped in-corridor aircraft
+Referee point (correct and sharper than the timeout question): the rollout runs
+for a fixed horizon (400 steps) and only agents that reached the exit (passed) or
+left via a boundary (out) enter `finished`; the driver measures
+`[a for a in finished if spawn_step>=warmup]`. Aircraft still IN the corridor at
+sim end -- never reached exit, never went lateral, never hit the 480-step time
+cap -- were previously dropped silently: not in the CR denominator, not in the
+completion denominator, neither passed nor discarded. With a 400-step window and
+a 480-step cap, a late entrant could in principle be censored before it can even
+time out. This right-censoring is more important than the cap itself, so we
+counted it.
+penetration_sim_censor.py adds, after the main loop,
+`still_in = [a for a in agents if not a.done and a.spawn_step>=warmup]` and
+returns `n_censored_in_corridor` / `n_finished_postwarmup`; the driver reports
+the censored share per p. CR/Thr/Delay/completion reproduce the SD/DISC runs.
+RESULT (both regimes, every p): n_censored_in_corridor = 0 at ALL points ->
+censored share = 0.0%.
+  LOW  finished post-warmup by p: 113,114,118,102,112 ; censored 0/0/0/0/0.
+  HIGH finished post-warmup by p: 269,273,284,294,311 ; censored 0/0/0/0/0.
+Reason: corridor Lc=600 m at cruise 25 m/s is a nominal ~120-step transit, while
+the post-warmup measurement window is 300 steps (horizon 400 - warmup 100), i.e.
+2.5x the transit time; even heavily deviated agents exit (pass or lateral) inside
+the window, so nothing is left mid-corridor at termination. The measured pool
+therefore equals every post-warmup entrant and the CR / completion denominators
+are complete -- no survivor bias from right-censoring. Combined with DISC2
+(timeout=0, all discards lateral) the corridor accounting is fully closed.
+Manuscript wording: "the measurement window (300 post-warm-up steps) is 2.5x the
+nominal corridor transit, and no aircraft remains in the corridor at termination
+at any equipage level, so every post-warm-up entrant is classified (pass or
+lateral exit) and the conflict- and completion-rate denominators are complete."
+Files: PENETRATION_LOW_CENSOR.txt, PENETRATION_HIGH_CENSOR.txt,
+run_penetration_censor.py, penetration_sim_censor.py.
+
 ## Version discipline
 Authoritative source = 05_experiments_results_v3.tex (holds all E/F/P batches).
 v4 is a divergent fork (it reverted the TASL weight placeholders) and is to be
