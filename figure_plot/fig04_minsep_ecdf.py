@@ -76,15 +76,18 @@ def main():
                 lw=2.0 if warm else 1.35, label=name, zorder=3)
         pr30[name] = float(np.mean(arms[name] < fs.THRESH))
     ax.axvline(fs.THRESH, **fs.THRESH_KW)
-    ax.annotate("30 m", (fs.THRESH, 0.955), xytext=(3, 0),
+    # place the 30 m tag lower on the line so it clears the upper-left legend
+    ax.annotate("30 m", (fs.THRESH, 0.60), xytext=(3, 0),
                 textcoords="offset points", fontsize=8, color="#D55E00")
     ax.set_xlim(5, 82); ax.set_ylim(0, 1.0)
     ax.set_xlabel("Minimum realized separation (m)")
     ax.set_ylabel("Cumulative fraction of encounters")
     fs.panel_label(ax, "(a)", x=-0.01, y=1.02)
-    ax.legend(loc="center right", frameon=False, fontsize=7.6,
-              labelspacing=0.3, handletextpad=0.5, borderaxespad=0.6,
-              bbox_to_anchor=(1.0, 0.44))
+    # legend in the upper-left dead space (ECDF curves are still ~0 there),
+    # so it no longer collides with the lower-right zoom inset or its title.
+    ax.legend(loc="upper left", frameon=False, fontsize=7.6,
+              labelspacing=0.3, handletextpad=0.5, borderaxespad=0.8,
+              bbox_to_anchor=(0.015, 0.985))
 
     # right-edge summary strip: Pr(min-sep < 30 m) = each arm's conflict rate,
     # pinning the quantitative threshold conclusion directly onto the figure.
