@@ -114,6 +114,7 @@ def main():
     n_conf_with_infeas = 0        # conflicts having >=1 eps=0-infeasible step
     n_conf_all_feas = 0           # conflicts where eps=0 feasible at every step
     per_conf_infeas_steps = []
+    per_conf_step_infeas = []   # 22x20 raster: per-conflict 0/1 per rollout step
     for _ in range(N // 8):
         x0, nh, nf, _r, _f = gen.sample(8, T, DEV)
         # closed-loop rollout with the real (slacked) planner
@@ -140,6 +141,7 @@ def main():
                 continue
             n_conf += 1
             infeas_steps = 0
+            step_row = [0] * T
             for t in range(T):
                 xb = traj_x[t][b]
                 p0v = xb[0:3].cpu().numpy()
@@ -157,7 +159,9 @@ def main():
                 feas = noslack_feasible(prob, params, p0v, v0v, p_refv, npred)
                 if feas is False:
                     infeas_steps += 1
+                    step_row[t] = 1
             per_conf_infeas_steps.append(infeas_steps)
+            per_conf_step_infeas.append(step_row)
             if infeas_steps > 0:
                 n_conf_with_infeas += 1
             else:
@@ -185,6 +189,9 @@ def main():
         os.makedirs(_figdd, exist_ok=True)
         np.save(os.path.join(_figdd, 'infeasible_steps.npy'), arr)
         w('  [dumped %d per-conflict infeasible-step counts -> infeasible_steps.npy]' % arr.size)
+        raster = np.array(per_conf_step_infeas, dtype=np.uint8)  # (n_conf, T)
+        np.save(os.path.join(_figdd, 'infeasibility_raster.npy'), raster)
+        w('  [dumped %dx%d per-step infeasibility raster -> infeasibility_raster.npy]' % raster.shape)
         w("  infeasible steps per conflict (mean/max) : %.2f / %d"
           % (arr.mean(), arr.max()))
     w("-" * 60)

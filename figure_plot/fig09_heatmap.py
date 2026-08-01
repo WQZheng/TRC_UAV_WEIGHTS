@@ -59,7 +59,16 @@ def main():
     gi = np.argsort(gammas)
     gammas = [gammas[i] for i in gi]; CR = CR[gi]
 
-    fig, ax = plt.subplots(figsize=(4.8, 4.0))
+    # main heatmap + slim marginal-mean strips (row means right, col means top).
+    # NO contour / interpolated "CR=30%" boundary: on a 4x4 grid that would
+    # require interpolating a smooth edge the discrete data cannot support.
+    fig = plt.figure(figsize=(5.3, 4.4))
+    gs = fig.add_gridspec(2, 2, width_ratios=[4.0, 0.7],
+                          height_ratios=[0.7, 4.0], wspace=0.06, hspace=0.06)
+    ax = fig.add_subplot(gs[1, 0])
+    ax_top = fig.add_subplot(gs[0, 0], sharex=ax)
+    ax_right = fig.add_subplot(gs[1, 1], sharey=ax)
+
     im = ax.imshow(CR, origin="lower", aspect="auto", cmap="YlOrRd",
                    vmin=float(np.floor(CR.min() / 10) * 10),
                    vmax=float(np.ceil(CR.max() / 10) * 10))
@@ -67,6 +76,19 @@ def main():
     ax.set_yticks(range(len(gammas))); ax.set_yticklabels([f"{g:g}" for g in gammas])
     ax.set_xlabel(r"Acceleration bound, $a_{\max}$ (m/s$^2$)")
     ax.set_ylabel(r"Barrier coefficient, $\gamma$")
+
+    # marginal means (grey bars; a compact "which axis moves CR" summary)
+    col_mean = CR.mean(0); row_mean = CR.mean(1)
+    ax_top.bar(range(len(amaxs)), col_mean, width=0.7, color="0.55", lw=0)
+    ax_top.set_ylabel("col\nmean", fontsize=6.6, labelpad=1)
+    ax_top.tick_params(labelbottom=False, labelsize=6.2)
+    ax_right.barh(range(len(gammas)), row_mean, height=0.7, color="0.55", lw=0)
+    ax_right.set_xlabel("row mean", fontsize=6.6)
+    ax_right.tick_params(labelleft=False, labelsize=6.2)
+    for a_ in (ax_top, ax_right):
+        for s in ("top", "right"):
+            a_.spines[s].set_visible(False)
+        a_.grid(False)
 
     vmid = 0.5 * (CR.min() + CR.max())
     for i in range(len(gammas)):
@@ -83,8 +105,10 @@ def main():
     except ValueError:
         print("WARNING: deployment cell not on grid; marking skipped")
 
-    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("Conflict rate, CR (%)")
+    cax = ax.inset_axes([1.28, 0.0, 0.06, 1.0])
+    cb = fig.colorbar(im, cax=cax)
+    cb.set_label("Conflict rate, CR (%)", fontsize=8.5)
+    cb.ax.tick_params(labelsize=7)
 
     # small legend below (Deployment only; Training explained in caption)
     handles = [plt.Line2D([], [], marker="s", ls="none", mfc="none",

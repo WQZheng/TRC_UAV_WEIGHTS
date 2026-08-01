@@ -257,3 +257,63 @@ def marginal_kde(ax_m, x, color, orient="x", lw=1.2, fill=True):
         if fill:
             ax_m.fill_betweenx(grid, 0, d, color=color, alpha=0.35, lw=0)
         ax_m.plot(d, grid, color=color, lw=lw)
+
+
+def point_range(ax, i, val, lo, hi, color, marker="o", ms=8.0, horizontal=False,
+                mfc=None, mec=None, mew=0.8, capsize=3, lw=1.1, zorder=4):
+    """A single point estimate with an asymmetric CI whisker at slot i.
+    horizontal=True lays the whisker along x (value on x-axis, category on y)."""
+    if horizontal:
+        ax.plot([lo, hi], [i, i], color=color, lw=lw, solid_capstyle="butt",
+                zorder=zorder)
+        for e in (lo, hi):
+            ax.plot([e, e], [i - 0.11, i + 0.11], color=color, lw=lw, zorder=zorder)
+        ax.plot([val], [i], marker=marker, ls="none", ms=ms,
+                mfc=mfc or color, mec=mec or color, mew=mew, zorder=zorder + 1)
+    else:
+        ax.errorbar(i, val, yerr=[[val - lo], [hi - val]], capsize=capsize,
+                    elinewidth=lw, ls="none", color=color, zorder=zorder)
+        ax.plot([i], [val], marker=marker, ls="none", ms=ms,
+                mfc=mfc or color, mec=mec or color, mew=mew, zorder=zorder + 1)
+
+
+def binary_raster(ax, M, col_colors, row_order=None, cmap_bg="#EEF1F4"):
+    """Draw a binary (0/1) raster: rows = episodes, cols = methods/steps.
+    A 0 cell is pale background, a 1 cell is filled with the column's colour
+    (so each column keeps its method identity). `M` is (n_rows, n_cols); if
+    `row_order` is given, rows are permuted by it (e.g. sorted by conflict
+    pattern). Returns the row order actually used."""
+    M = _np.asarray(M).astype(int)
+    n, m = M.shape
+    if row_order is None:
+        row_order = _np.arange(n)
+    Mo = M[row_order]
+    # background
+    ax.add_patch(plt.Rectangle((0, 0), m, n, fc=cmap_bg, ec="none", zorder=0))
+    for j in range(m):
+        ones = _np.where(Mo[:, j] == 1)[0]
+        for r in ones:
+            ax.add_patch(plt.Rectangle((j, n - 1 - r), 1, 1,
+                                       fc=col_colors[j], ec="white", lw=0.3,
+                                       zorder=2))
+    ax.set_xlim(0, m); ax.set_ylim(0, n)
+    ax.set_aspect("auto")
+    return row_order
+
+
+def scatter_family_hull(ax, pts, color, alpha=0.10, expand=1.0):
+    """Draw a faint convex-hull polygon around a cluster of 2-D points `pts`
+    (list of (x,y)) to mark a method family, without any text/legend. Falls
+    back to an ellipse-free bounding pad for < 3 points."""
+    P = _np.asarray(pts, float)
+    if P.shape[0] < 3:
+        return
+    try:
+        from scipy.spatial import ConvexHull
+        h = ConvexHull(P)
+        poly = P[h.vertices]
+    except Exception:
+        return
+    c = poly.mean(0)
+    poly = c + (poly - c) * expand
+    ax.fill(poly[:, 0], poly[:, 1], color=color, alpha=alpha, lw=0, zorder=1)

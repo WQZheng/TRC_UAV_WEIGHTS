@@ -64,6 +64,20 @@ def main():
     fs.set_rc()
     se = effort_se()
     fig, ax = plt.subplots(figsize=(6.2, 3.8))
+
+    # faint convex-hull family envelopes (reviewer-approved; no hexbin/2D-KDE,
+    # no bubble-size encoding -- all arms share n=200 so size carries nothing).
+    fam = {"cert": [], "free": []}
+    for name in ROW:
+        eff, cr, _ = ROW[name]
+        f = fs.STYLE[name]["family"]
+        fam.setdefault(f, []).append((eff, cr))
+    fs.scatter_family_hull(ax, fam.get("cert", []), fs.STYLE["Stage 2"]["color"],
+                           alpha=0.08, expand=1.18)
+    fs.scatter_family_hull(ax, fam.get("free", []),
+                           fs.STYLE["Vanilla-MPC"]["color"], alpha=0.08,
+                           expand=1.30)
+
     for name in fs.ordered(ROW.keys()):
         eff, cr, k = ROW[name]
         lo, hi = fs.wilson_ci(k, N)
@@ -81,13 +95,6 @@ def main():
     ax.set_ylim(0, 65)
     ax.set_xlim(10, 65)
     fs.panel_label(ax, "")   # single panel, no letter
-    # faint cluster arrows (encoding-first; minimal text)
-    ax.annotate("certificate-free", (18, 47), (30, 58),
-                arrowprops=dict(arrowstyle="->", color="0.6", lw=0.8),
-                fontsize=7.5, color="0.5", ha="center")
-    ax.annotate("certificate-equipped", (54, 12), (44, 25),
-                arrowprops=dict(arrowstyle="->", color="0.6", lw=0.8),
-                fontsize=7.5, color="0.5", ha="center")
     ax.legend(loc="center left", bbox_to_anchor=(1.005, 0.5), frameon=False,
               fontsize=8, handletextpad=0.4, labelspacing=0.35)
     out = os.path.join(OUT, "fig05_effort_cr.pdf")

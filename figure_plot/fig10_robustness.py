@@ -97,6 +97,13 @@ def main():
         arms_present.append(name)
     axb.set_ylabel("Conflict rate, CR (%)"); axb.set_ylim(0, 65)
     axb.set_xlabel(r"Wind scaling, $\eta_w$"); axb.set_xticks(etas)
+    # nominal-evaluation reference: the main table uses eta_w = 0.3, which lies
+    # BELOW this CLEAN sweep (0.5/1.0/1.5). We annotate it rather than fabricate
+    # a 0.3 point on the curve. The flat traces ARE the result (safety tracks
+    # the certificate, not the wind), so no ranking/bump chart is used.
+    axb.annotate(r"main eval $\eta_w{=}0.3$", (etas[0], 3), xytext=(2, 0),
+                 textcoords="offset points", ha="left", va="bottom",
+                 fontsize=6.8, color="0.45")
     fs.panel_label(axb, "(b)")
     axc.set_ylabel("Minimum separation (m)")
     axc.axhline(fs.THRESH, **fs.THRESH_KW)
