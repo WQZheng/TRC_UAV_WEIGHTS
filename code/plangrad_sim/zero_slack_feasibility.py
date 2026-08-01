@@ -19,6 +19,7 @@ Protocol mirrors the deployment evaluation exactly: best planner
 Predictions come from the deployed Stage-2 predictor and are detached
 (held fixed) -- we test the planner's feasibility, not the predictor.
 """
+import os
 import torch
 import numpy as np
 import cvxpy as cp
@@ -179,6 +180,11 @@ def main():
           % (100.0 * n_conf_with_infeas / n_conf))
     if per_conf_infeas_steps:
         arr = np.array(per_conf_infeas_steps)
+        _figdd = os.environ.get('FIGDATA_DIR',
+            '/data/lab/TRC_UAV_WEIGHTS/code/baselines/figures_gen/fig_data')
+        os.makedirs(_figdd, exist_ok=True)
+        np.save(os.path.join(_figdd, 'infeasible_steps.npy'), arr)
+        w('  [dumped %d per-conflict infeasible-step counts -> infeasible_steps.npy]' % arr.size)
         w("  infeasible steps per conflict (mean/max) : %.2f / %d"
           % (arr.mean(), arr.max()))
     w("-" * 60)
