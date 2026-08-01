@@ -120,11 +120,15 @@ def main():
            f"95% CI $[{PAIRED[1]:.3f}, {PAIRED[2]:.3f}]$",
            transform=b.transAxes, ha="right", va="bottom", fontsize=7.5,
            linespacing=1.3)
+    # legend to UPPER-right: the e_par points sit on the left (negative) side
+    # and the paired-Delta annotation occupies the lower-right, so the upper
+    # right is the only clear region -- prevents the previous legend/annotation
+    # overlap.
     handles = [plt.Line2D([], [], color=fs.STYLE[a]["color"],
                           marker=fs.STYLE[a]["marker"], ls="none", ms=8,
                           label=a) for a in ["Stage-1b", "Stage 2"]]
-    b.legend(handles=handles, loc="lower right", frameon=False, fontsize=8,
-             bbox_to_anchor=(1.0, 0.16))
+    b.legend(handles=handles, loc="upper right", frameon=False, fontsize=8,
+             bbox_to_anchor=(1.0, 1.0))
     fs.panel_label(b, "(b)")
 
     out = os.path.join(OUT, "fig07_cpa_error.pdf")

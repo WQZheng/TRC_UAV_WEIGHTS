@@ -61,14 +61,21 @@ def set_rc():
         "font.family": "serif",
         "font.serif": ["STIXGeneral", "DejaVu Serif", "Times New Roman"],
         "mathtext.fontset": "stix",
+        # unified font hierarchy (v4 layout discipline):
+        #   axis title 10 / ticks 8.5 / legend 8 / default (annotations) 7.5
+        "font.size": 7.5,
         "axes.labelsize": 10, "axes.titlesize": 10,
         "xtick.labelsize": 8.5, "ytick.labelsize": 8.5,
-        "legend.fontsize": 8.5,
+        "legend.fontsize": 8.0,
+        "legend.handlelength": 1.6, "legend.handletextpad": 0.5,
+        "legend.labelspacing": 0.35, "legend.borderaxespad": 0.6,
         "lines.linewidth": 1.7, "lines.markersize": 6.0,
         "axes.linewidth": 0.8,
         "axes.grid": True, "grid.color": "0.88", "grid.linewidth": 0.6,
         "axes.axisbelow": True, "figure.dpi": 150, "savefig.dpi": 600,
         "savefig.bbox": "tight", "savefig.pad_inches": 0.02,
+        "figure.constrained_layout.h_pad": 0.06,
+        "figure.constrained_layout.w_pad": 0.06,
         "pdf.fonttype": 42, "ps.fonttype": 42,
     })
 

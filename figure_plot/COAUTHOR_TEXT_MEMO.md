@@ -63,6 +63,24 @@ p=1.00 (`STATS_COCHRAN`) — i.e. the four certificate arms are statistically
 indistinguishable in CR. Ensure the §5.2 text does not over-claim a CR ranking
 among them.
 
+## 6. Fig 3(c) reveals conflicts are difficulty-driven, not method-driven
+
+New panel Fig 3(c) shows the conflict *co-occurrence patterns* across the four
+common-planner arms (`conflict_vectors_q2.npz`, n=200, verified this session):
+
+- **25/200** episodes have ≥1 arm in conflict; per-arm conflict counts are
+  22/23/25/24 (= main-table CR 11.0/11.5/12.5/12.0%).
+- Of those 25 episodes, **21 are all-four-arms-conflict** (every arm conflicts on
+  the *same* episode); only 4 episodes distinguish the methods.
+
+**Interpretation (worth one sentence in §5.2):** residual conflicts are driven
+almost entirely by **episode difficulty** — a small set of intrinsically hard
+encounters where every planner conflicts — rather than by planner-specific
+weakness. This directly reinforces the §5.5 / Fig 8 attribution that residual
+conflicts are actuation-limited, not predictor-limited. No text change is
+required, but stating this makes Fig 3(c) self-explanatory and preempts the
+"why do all methods look similar" reviewer question.
+
 ## 5. Soft-IPP weight missing on Lab
 
 `04_soft_ipp/soft_joint.pt` is absent, so the collector omits Soft-IPP from the
