@@ -126,3 +126,134 @@ def wilson_ci(k, n, z=1.96):
     c = (p + z * z / (2 * n)) / d
     h = (z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)) / d
     return (100.0 * (c - h), 100.0 * (c + h))
+
+
+# =====================================================================
+# v2 visual vocabulary -- reusable helpers shared by every results figure
+# so the 11 figures stay stylistically consistent. All are colour-blind
+# safe (Okabe-Ito), draw only real data, and add NO in-figure conclusion
+# text. KDEs use scipy.stats.gaussian_kde with a light fallback.
+# =====================================================================
+import numpy as _np
+
+
+def _kde(x, grid, bw="scott"):
+    """Gaussian KDE density on `grid`; degrades gracefully for tiny/constant x."""
+    x = _np.asarray(x, float)
+    x = x[_np.isfinite(x)]
+    if x.size < 2 or _np.allclose(x, x[0]):
+        # spike at the single value (histogram-like), avoids KDE blow-up
+        d = _np.zeros_like(grid)
+        if x.size:
+            d[_np.argmin(_np.abs(grid - x[0]))] = 1.0
+        return d
+    try:
+        from scipy.stats import gaussian_kde
+        return gaussian_kde(x, bw_method=bw)(grid)
+    except Exception:
+        # manual Gaussian KDE (Silverman bandwidth)
+        n = x.size
+        h = 1.06 * x.std(ddof=1) * n ** (-1 / 5) or 1.0
+        u = (grid[:, None] - x[None, :]) / h
+        return (_np.exp(-0.5 * u * u).sum(1)) / (n * h * _np.sqrt(2 * _np.pi))
+
+
+def half_violin(ax, x, y0, color, width=0.8, side="up", grid=None,
+                lw=0.9, alpha=0.55, zorder=3):
+    """One half-violin (density ridge) for sample `x`, baseline at y0.
+    side='up' fills upward (ridgeline), 'right' fills to +x (raincloud).
+    Returns the density scale used, so a caller can stack consistently."""
+    x = _np.asarray(x, float); x = x[_np.isfinite(x)]
+    if grid is None:
+        lo, hi = _np.nanmin(x), _np.nanmax(x)
+        pad = 0.08 * (hi - lo + 1e-9)
+        grid = _np.linspace(lo - pad, hi + pad, 256)
+    d = _kde(x, grid)
+    if d.max() > 0:
+        d = d / d.max() * width
+    if side == "up":
+        ax.fill_between(grid, y0, y0 + d, color=color, alpha=alpha,
+                        lw=0, zorder=zorder)
+        ax.plot(grid, y0 + d, color=color, lw=lw, zorder=zorder + 1)
+    else:  # 'right' -- density along +y at horizontal position y0
+        ax.fill_betweenx(grid, y0, y0 + d, color=color, alpha=alpha,
+                         lw=0, zorder=zorder)
+        ax.plot(y0 + d, grid, color=color, lw=lw, zorder=zorder + 1)
+    return grid, d
+
+
+def raincloud(ax, x, y0, color, width=0.32, jitter=0.09, box=True,
+              point_ms=2.4, seed=0, zorder=3):
+    """Horizontal raincloud at row y0: half-violin ('cloud', above) +
+    jittered raw points ('rain', below) + median dot & IQR bar.
+    Encodes the full sample, not just a summary -- Nature-style honesty."""
+    x = _np.asarray(x, float); x = x[_np.isfinite(x)]
+    # cloud (half violin, opening upward from y0)
+    lo, hi = _np.nanmin(x), _np.nanmax(x)
+    pad = 0.08 * (hi - lo + 1e-9)
+    grid = _np.linspace(lo - pad, hi + pad, 256)
+    d = _kde(x, grid)
+    if d.max() > 0:
+        d = d / d.max() * width
+    ax.fill_between(grid, y0, y0 + d, color=color, alpha=0.5, lw=0,
+                    zorder=zorder)
+    ax.plot(grid, y0 + d, color=color, lw=0.9, zorder=zorder + 1)
+    # rain (jittered raw points, below the row)
+    rng = _np.random.default_rng(seed)
+    yj = y0 - 0.06 - rng.uniform(0, jitter, size=x.size)
+    ax.plot(x, yj, ls="none", marker="o", ms=point_ms, mfc=color,
+            mec="none", alpha=0.45, zorder=zorder)
+    # median + IQR
+    q1, med, q3 = _np.percentile(x, [25, 50, 75])
+    if box:
+        ax.plot([q1, q3], [y0 - 0.02, y0 - 0.02], color="0.15", lw=2.2,
+                solid_capstyle="butt", zorder=zorder + 2)
+    ax.plot([med], [y0 - 0.02], marker="o", ms=4.5, mfc="white",
+            mec="0.1", mew=1.1, zorder=zorder + 3)
+    return med, (q1, q3)
+
+
+def ridgeline(ax, samples, labels, colors, gap=0.9, width=1.35, lw=1.0):
+    """Stacked density ridges (joyplot). `samples` is a list of 1-D arrays,
+    drawn bottom->top; returns the y baseline of each row for tick labels.
+    Overlap is controlled by width>gap. Shared x across all rows."""
+    ys = []
+    allx = _np.concatenate([_np.asarray(s, float) for s in samples])
+    allx = allx[_np.isfinite(allx)]
+    lo, hi = _np.nanmin(allx), _np.nanmax(allx)
+    pad = 0.06 * (hi - lo)
+    grid = _np.linspace(lo - pad, hi + pad, 320)
+    for i, (s, c) in enumerate(zip(samples, colors)):
+        y0 = i * gap
+        ys.append(y0)
+        d = _kde(s, grid)
+        if d.max() > 0:
+            d = d / d.max() * width
+        ax.fill_between(grid, y0, y0 + d, color=c, alpha=0.72, lw=0,
+                        zorder=10 + i)
+        ax.plot(grid, y0 + d, color="white", lw=lw + 0.4, zorder=10 + i)
+        ax.plot(grid, y0 + d, color=c, lw=lw, zorder=10 + i)
+    ax.set_yticks(ys); ax.set_yticklabels(labels)
+    ax.set_ylim(-0.4 * gap, (len(samples) - 1) * gap + width + 0.25)
+    return ys, (grid[0], grid[-1])
+
+
+def marginal_kde(ax_m, x, color, orient="x", lw=1.2, fill=True):
+    """Draw a 1-D marginal density on a slim marginal axis (for scatter
+    figures). orient='x' = density along the shared x (top marginal),
+    'y' = along shared y (right marginal)."""
+    x = _np.asarray(x, float); x = x[_np.isfinite(x)]
+    lo, hi = _np.nanmin(x), _np.nanmax(x)
+    pad = 0.06 * (hi - lo + 1e-9)
+    grid = _np.linspace(lo - pad, hi + pad, 256)
+    d = _kde(x, grid)
+    if d.max() > 0:
+        d = d / d.max()
+    if orient == "x":
+        if fill:
+            ax_m.fill_between(grid, 0, d, color=color, alpha=0.35, lw=0)
+        ax_m.plot(grid, d, color=color, lw=lw)
+    else:
+        if fill:
+            ax_m.fill_betweenx(grid, 0, d, color=color, alpha=0.35, lw=0)
+        ax_m.plot(d, grid, color=color, lw=lw)

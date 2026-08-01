@@ -1,23 +1,30 @@
 #!/usr/bin/env python3
 """Figure 4 -- empirical distributions of minimum realized separation.
 
-Single-panel ECDF with an inset zoom around the 30 m standard.
-  Main: ECDF of per-episode minimum separation (15-75 m) for all seven
-        non-Oracle arms. Certificate arms = thin cool solid lines; Vanilla /
-        Soft-IPP = thicker warm dashed. Thin red dashed line at x=30 m
-        labelled only "30 m".
-  Inset: zoom x in [25,35], y in [0.05,0.20], showing only Stage 2, Stage-1b,
-        Stage 1, CV, Conformal (Vanilla/Soft omitted to avoid occlusion). No
-        inset legend.
+v2 hero visual: a RIDGELINE (joyplot). Each non-Oracle arm gets one density
+ridge of its per-episode minimum-separation sample, stacked bottom->top in the
+fixed legend order, sharing a common x axis. A single thin red dashed line at
+x = 30 m cuts vertically through every ridge, so the reader sees at a glance
+that the certificate arms' mass sits to the RIGHT of the standard while the
+certificate-free Vanilla ridge piles up on/left of it. Ridge fill uses the
+per-method Okabe-Ito colour; certificate-free arms additionally carry a dashed
+outline to preserve the family encoding. A slim ECDF inset (top-right) keeps
+the quantitative tail readout around 30 m.
+
+No in-figure title/conclusion text; only the "30 m" tick label and the (a)/(b)
+free panel labels. Fonts >= 8 pt, vector PDF.
 
 DATA PROVENANCE
-  Per-episode minimum-separation arrays for the seven arms, produced on the
+  Per-episode minimum-separation arrays for the available arms, produced on the
   Lab by figures_gen/collect_fig_data.py at n=200, seed 12345, eta_w=0.3,
-  evtol encounters 2500-2999, deployment planner, using the OSQP fast CBF
-  solver (identical QP to the differentiable layer; verified). Loaded from
-  fig_data/minsep_effort.npz (keys "<arm>__minsep"). Arm CR reproduces the v9
-  main table (Stage 2 ~11.0). The stale local baselines/figures_gen/data JSONs
-  are NOT used (old dead path, PlanGrad CR=12.0, contradicts the 11.0 table).
+  evtol encounters 2500-2999, deployment planner, OSQP fast CBF solver
+  (identical QP to the differentiable layer; verified). Loaded from
+  fig_data/minsep_effort.npz (keys "<arm>__minsep"). frac(<30 m) per arm
+  reproduces the v9 main-table conflict rate (Stage 2 11.0 %, Stage-1b 11.5 %,
+  Stage 1 12.5 %, CV 12.0 %, Conformal 11.5 %, Vanilla 40.5 %). Soft-IPP has no
+  weight on disk (soft_joint.pt absent) so it is honestly omitted -- the ridge
+  set is drawn only for arms with real data. Stale local
+  baselines/figures_gen/data JSONs are NOT used.
 """
 import os, sys
 import numpy as np
@@ -57,39 +64,73 @@ def main():
         if k.endswith("__minsep"):
             raw = k[:-len("__minsep")]
             if raw in ARMMAP:
-                arms[ARMMAP[raw]] = d[k]
+                arms[ARMMAP[raw]] = np.asarray(d[k], float)
 
-    fig, ax = plt.subplots(figsize=(6.4, 3.8))
-    for name in fs.ordered(arms.keys()):
-        xs, ys = ecdf(arms[name])
-        s = fs.STYLE[name]
-        warm = s["family"] == "free"
-        ax.plot(xs, ys, color=s["color"], ls=s["ls"],
-                lw=2.0 if warm else 1.3, label=name, zorder=3)
-    ax.axvline(fs.THRESH, **fs.THRESH_KW)
-    ax.annotate("30 m", (fs.THRESH, 0.9), textcoords="offset points",
-                xytext=(3, 0), fontsize=8, color="#D55E00")
-    ax.set_xlim(15, 75); ax.set_ylim(0, 1)
+    names = fs.ordered(arms.keys())          # bottom(free) .. top(cert), see below
+    # stack so that certificate arms sit ABOVE the free arms: reverse the fixed
+    # legend order (Oracle-side first) into bottom->top drawing order.
+    draw = list(reversed(names))
+    samples = [arms[n] for n in draw]
+    colors = [fs.STYLE[n]["color"] for n in draw]
+    labels = draw
+
+    fig, ax = plt.subplots(figsize=(6.6, 4.4))
+    ys, (gx0, gx1) = fs.ridgeline(ax, samples, labels, colors,
+                                  gap=0.9, width=1.45, lw=1.0)
+
+    # certificate-free arms get a dashed ridge outline to keep the family code
+    for i, n in enumerate(draw):
+        if fs.STYLE[n]["family"] == "free":
+            y0 = ys[i]
+            grid = np.linspace(gx0, gx1, 320)
+            from figstyle import _kde
+            dd = _kde(arms[n], grid)
+            dd = dd / dd.max() * 1.45 if dd.max() > 0 else dd
+            ax.plot(grid, y0 + dd, color=fs.STYLE[n]["color"], lw=1.3,
+                    ls="--", zorder=40)
+
+    # median tick per ridge (small white-filled dot on the baseline)
+    for i, n in enumerate(draw):
+        med = float(np.median(arms[n]))
+        ax.plot([med], [ys[i]], marker="o", ms=4.2, mfc="white",
+                mec="0.15", mew=1.0, zorder=60, clip_on=False)
+
+    # 30 m standard: one vertical red dashed line through all ridges
+    ax.axvline(fs.THRESH, **fs.THRESH_KW, ymin=0, ymax=1)
+    ax.annotate("30 m", (fs.THRESH, 1.0), xycoords=("data", "axes fraction"),
+                xytext=(3, -2), textcoords="offset points", ha="left",
+                va="top", fontsize=8, color="#D55E00")
+
+    ax.set_xlim(5, 78)
     ax.set_xlabel("Minimum realized separation (m)")
-    ax.set_ylabel("Cumulative fraction of encounters")
+    ax.set_ylabel("")
+    ax.grid(axis="y", visible=False)
+    for s in ("left", "right", "top"):
+        ax.spines[s].set_visible(False)
+    fs.panel_label(ax, "(a)", x=-0.01, y=1.02)
 
-    # inset zoom
-    iax = ax.inset_axes([0.52, 0.14, 0.44, 0.42])
+    # ---- ECDF inset (top-right), quantitative tail readout near 30 m --------
+    iax = ax.inset_axes([0.60, 0.60, 0.37, 0.36])
     for name in INSET_ARMS:
         if name in arms:
-            xs, ys = ecdf(arms[name])
+            xs, yy = ecdf(arms[name])
             s = fs.STYLE[name]
-            iax.plot(xs, ys, color=s["color"], ls=s["ls"], lw=1.3)
+            iax.plot(xs, yy, color=s["color"], ls=s["ls"], lw=1.2)
+    if "Vanilla-MPC" in arms:
+        xs, yy = ecdf(arms["Vanilla-MPC"])
+        s = fs.STYLE["Vanilla-MPC"]
+        iax.plot(xs, yy, color=s["color"], ls="--", lw=1.6)
     iax.axvline(fs.THRESH, **fs.THRESH_KW)
-    iax.set_xlim(25, 35); iax.set_ylim(0.05, 0.20)
+    iax.set_xlim(20, 55); iax.set_ylim(0, 0.6)
+    iax.set_xlabel("sep. (m)", fontsize=7, labelpad=1)
+    iax.set_ylabel("ECDF", fontsize=7, labelpad=1)
     iax.tick_params(labelsize=6.5)
-    iax.set_title("zoom", fontsize=7, pad=2)
+    iax.grid(True, color="0.9", lw=0.5)
+    fs.panel_label(iax, "(b)", x=-0.04, y=1.03)
 
-    # legend bottom, two rows, below axes
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=4,
-              frameon=False, fontsize=8, columnspacing=1.3, handletextpad=0.4)
     out = os.path.join(OUT, "fig04_minsep_ecdf.pdf")
-    fig.savefig(out, bbox_inches="tight"); print("wrote", out)
+    fig.savefig(out, bbox_inches="tight")
+    print("wrote", out, "| ridges:", labels)
 
 
 if __name__ == "__main__":
