@@ -317,3 +317,76 @@ def scatter_family_hull(ax, pts, color, alpha=0.10, expand=1.0):
     c = poly.mean(0)
     poly = c + (poly - c) * expand
     ax.fill(poly[:, 0], poly[:, 1], color=color, alpha=alpha, lw=0, zorder=1)
+
+
+def conflict_pattern_bars(ax_bar, ax_dot, M, col_colors, col_labels,
+                          max_patterns=12):
+    """UpSet-style compact view of a sparse binary matrix M (n_episodes x
+    n_methods): show only the conflict PATTERNS that actually occur (which
+    subset of methods conflicted together on an episode), as horizontal bars of
+    episode-count (ax_bar), with a membership dot-matrix on the left (ax_dot)
+    marking which methods define each pattern. The all-clear pattern is
+    excluded. Rows are sorted by count (largest at top). No wasted whitespace.
+
+    Returns list of (pattern_tuple, count) drawn, most-frequent first."""
+    M = _np.asarray(M).astype(int)
+    n, m = M.shape
+    # count distinct non-empty patterns
+    keys = {}
+    for r in range(n):
+        pat = tuple(M[r].tolist())
+        if sum(pat) == 0:
+            continue
+        keys[pat] = keys.get(pat, 0) + 1
+    items = sorted(keys.items(), key=lambda kv: (-kv[1], -sum(kv[0])))
+    items = items[:max_patterns]
+    K = len(items)
+    ypos = _np.arange(K)[::-1]           # largest count at top
+
+    # membership dot-matrix (left)
+    for xi in range(m):
+        ax_dot.plot([xi] * K, ypos, ls="none", marker="o", ms=6.5,
+                    mfc="#E3E7EC", mec="none", zorder=1)
+    for row, (pat, _) in zip(ypos, items):
+        members = [xi for xi in range(m) if pat[xi] == 1]
+        for xi in members:
+            ax_dot.plot(xi, row, ls="none", marker="o", ms=6.5,
+                        mfc=col_colors[xi], mec="none", zorder=3)
+        if len(members) > 1:                     # connect co-conflict members
+            ax_dot.plot([min(members), max(members)], [row, row],
+                        color="0.35", lw=1.1, zorder=2)
+    ax_dot.set_xlim(-0.6, m - 0.4); ax_dot.set_ylim(-0.6, K - 0.4)
+    ax_dot.set_xticks(range(m))
+    ax_dot.set_xticklabels(col_labels, rotation=30, ha="right", fontsize=7)
+    ax_dot.set_yticks([])
+    for s in ("left", "right", "top", "bottom"):
+        ax_dot.spines[s].set_visible(False)
+    ax_dot.grid(False)
+
+    # count bars (right); bar coloured by the "lead" (first) member method
+    counts = [c for _, c in items]
+    barcol = [col_colors[[xi for xi in range(m) if pat[xi] == 1][0]]
+              for pat, _ in items]
+    ax_bar.barh(ypos, counts, height=0.6, color=barcol, lw=0, zorder=3)
+    for row, c in zip(ypos, counts):
+        ax_bar.annotate(str(c), (c, row), xytext=(2, 0),
+                        textcoords="offset points", va="center", ha="left",
+                        fontsize=7)
+    ax_bar.set_ylim(-0.6, K - 0.4)
+    ax_bar.set_yticks([])
+    ax_bar.set_xlim(0, max(counts) * 1.18)
+    for s in ("left", "right", "top"):
+        ax_bar.spines[s].set_visible(False)
+    ax_bar.grid(axis="x", color="0.9", lw=0.5)
+    return items
+
+
+def ribbon(ax, x, y, e, color, lw=2.0, marker="o", ms=4.5, ls="-",
+           label=None, band_alpha=0.18, zorder=3):
+    """A line with a filled +-e band (mean +- SD/CI). Cleaner than error bars
+    for a smooth sweep; used to differentiate dashboard panels."""
+    x = _np.asarray(x, float); y = _np.asarray(y, float); e = _np.asarray(e, float)
+    ax.fill_between(x, y - e, y + e, color=color, alpha=band_alpha, lw=0,
+                    zorder=zorder - 1)
+    ax.plot(x, y, color=color, lw=lw, marker=marker, ms=ms, ls=ls,
+            label=label, zorder=zorder)

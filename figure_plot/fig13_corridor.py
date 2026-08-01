@@ -100,13 +100,14 @@ def main():
                 es.append(data[p][grp].get(key + "_sd", np.nan))
         return np.array(xs), np.array(ys), np.array(es)
 
-    # (a) conflict rate
-    for grp, col, lab, lw in [("ALL", C_ALL, "All aircraft", 2.4),
-                              ("EQUIPPED", C_EQ, "Framework-equipped", 1.7),
-                              ("UNEQUIPPED", C_OR, "ORCA-controlled", 1.7)]:
+    # (a) conflict rate -- three group lines with error bars (mean +- SD).
+    # We only have mean/SD in the source tables (individual rep values are not
+    # stored), so we do NOT invent a raw-rep cloud; the whiskers carry spread.
+    for grp, col, lw in [("ALL", C_ALL, 2.4), ("EQUIPPED", C_EQ, 1.7),
+                         ("UNEQUIPPED", C_OR, 1.7)]:
         x, y, e = series(hi, grp, "cr")
         a.errorbar(x, y, yerr=e, marker="o", ms=4.5, lw=lw, color=col,
-                   capsize=2.5, elinewidth=0.9)
+                   capsize=2.5, elinewidth=0.9, zorder=4)
     a.set_ylabel("Conflict rate, CR (%)"); a.set_xticks(ps)
     a.set_xlabel("Framework penetration, $p$ (%)"); fs.panel_label(a, "(a)")
 
@@ -119,11 +120,15 @@ def main():
     xl2, yl2, _ = (series(lo, "ALL", "discard") if lo else (np.array([]),) * 3)
     have_disc = xh.size and not np.all(np.isnan(yh))
     if have_disc:
+        # ribbon band (0..value) so this panel reads differently from the line
+        # panels; the filled area emphasises "share of aircraft not completing".
+        b.fill_between(xh, 0, yh, color=C_ALL, alpha=0.16, lw=0, zorder=1)
         b.plot(xh, yh, marker="o", ms=4.5, lw=2.2, color=C_ALL,
-               label="high demand")
+               label="high demand", zorder=3)
         if xl2.size and not np.all(np.isnan(yl2)):
+            b.fill_between(xl2, 0, yl2, color=C_ALL, alpha=0.08, lw=0, zorder=1)
             b.plot(xl2, yl2, marker="s", ms=4.0, lw=1.7, color=C_ALL, ls="--",
-                   label="low demand")
+                   label="low demand", zorder=3)
         b.legend(loc="upper left", frameon=False, fontsize=7.5)
         b.set_ylim(0, max(12.0, np.nanmax(np.concatenate([yh, yl2]
                    if xl2.size else [yh])) + 2))
@@ -136,7 +141,7 @@ def main():
     b.set_ylabel("Non-completion share (%)")
     fs.panel_label(b, "(b)")
 
-    # (c) system delay (ALL), conditional on completion
+    # (c) system delay (ALL) -- plain line panel (high + low demand)
     x, y, e = series(hi, "ALL", "delay")
     c.errorbar(x, y, yerr=e, marker="o", ms=4.5, lw=2.2, color=C_ALL,
                capsize=2.5, elinewidth=0.9, label="high demand")
@@ -144,17 +149,26 @@ def main():
         xl, yl, el = series(lo, "ALL", "delay")
         c.errorbar(xl, yl, yerr=el, marker="s", ms=4.0, lw=1.7, color=C_ALL,
                    ls="--", capsize=2.5, elinewidth=0.9, label="low demand")
-        c.legend(loc="upper right", frameon=False, fontsize=7.5)
+        c.legend(loc="upper right", frameon=False, fontsize=7.2,
+                 borderaxespad=0.3)
     c.set_ylabel("System delay among\ncompleted transits (s)")
-    c.set_xticks(ps); c.set_xlabel("Framework penetration, $p$ (%)")
-    c.text(0.97, 0.97, "conditional on completion", transform=c.transAxes,
-           ha="right", va="top", fontsize=7, color="0.45")
+    c.set_xticks(ps)
+    # scope note moved to the x-label (was overlapping the legend before)
+    c.set_xlabel("Framework penetration, $p$ (%)\n"
+                 r"$\it{conditional\ on\ completion}$", fontsize=8.5)
     fs.panel_label(c, "(c)")
 
-    # (d) throughput
+    # (d) throughput -- horizontal point-range style (distinct from lines):
+    # each p is a point with a vertical CI whisker, connected by a thin guide.
     x, y, e = series(hi, "ALL", "thr")
-    d.errorbar(x, y, yerr=e, marker="o", ms=4.5, lw=2.2, color=C_ALL,
-               capsize=2.5, elinewidth=0.9)
+    d.plot(x, y, color="0.7", lw=1.0, zorder=1)
+    for xi, yi, ei in zip(x, y, e):
+        ei = 0.0 if np.isnan(ei) else ei
+        d.plot([xi, xi], [yi - ei, yi + ei], color=C_ALL, lw=1.3, zorder=2)
+        for ee in (yi - ei, yi + ei):
+            d.plot([xi - 2, xi + 2], [ee, ee], color=C_ALL, lw=1.0, zorder=2)
+        d.plot(xi, yi, marker="o", ms=6, mfc="white", mec=C_ALL, mew=1.5,
+               zorder=3)
     d.set_ylabel("Completed transits per minute")
     d.set_xticks(ps); d.set_xlabel("Framework penetration, $p$ (%)")
     lo_y = np.nanmin(y) - 3; hi_y = np.nanmax(y) + 3

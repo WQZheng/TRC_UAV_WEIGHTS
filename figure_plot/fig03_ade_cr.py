@@ -80,11 +80,16 @@ def load_raster():
 
 def main():
     fs.set_rc()
-    fig = plt.figure(figsize=(7.6, 3.5))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.5, 0.95, 0.9], wspace=0.42)
+    fig = plt.figure(figsize=(7.9, 3.4))
+    # three logical panels; panel (c) is a two-column composite (membership
+    # dot-matrix + episode-count bars) built as a tight sub-gridspec so the two
+    # halves stay glued while a/b/c keep normal separation.
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.55, 0.9, 1.15], wspace=0.42)
     axa = fig.add_subplot(gs[0, 0])
     axb = fig.add_subplot(gs[0, 1])
-    axc = fig.add_subplot(gs[0, 2])
+    sub = gs[0, 2].subgridspec(1, 2, width_ratios=[0.62, 0.55], wspace=0.05)
+    axc_dot = fig.add_subplot(sub[0, 0])
+    axc_bar = fig.add_subplot(sub[0, 1])
 
     # ---- panel (a): ADE vs CR scatter --------------------------------------
     for name in fs.ordered(ROW.keys()):
@@ -136,35 +141,28 @@ def main():
              transform=axb.transAxes, ha="right", va="top", fontsize=7.2,
              linespacing=1.3)
 
-    # ---- panel (c): 200x4 paired conflict raster ---------------------------
+    # ---- panel (c): conflict-PATTERN counts (compact UpSet-style) ----------
+    # A dense 200x4 raster is 89% empty (conflicts are rare, ~11-12%); instead
+    # show only the conflict patterns that actually occur, as episode-count bars
+    # with a membership dot-matrix. This keeps the paired structure (which arms
+    # conflict together on the same episode) with zero wasted whitespace.
     R = load_raster()
     if R is None:
-        axc.text(0.5, 0.5, "conflict_vectors_q2.npz\nnot found", ha="center",
-                 va="center", fontsize=8, color="0.4", transform=axc.transAxes)
-        axc.axis("off")
+        axc_dot.text(0.5, 0.5, "conflict_vectors_q2.npz\nnot found",
+                     ha="center", va="center", fontsize=8, color="0.4",
+                     transform=axc_dot.transAxes)
+        axc_dot.axis("off"); axc_bar.axis("off")
     else:
         M, cols = R
         col_colors = [fs.STYLE[n]["color"] for n in cols]
-        # sort rows by conflict pattern: episodes with more/earlier conflicts up.
-        # key = (total conflicts, binary pattern) descending -> conflict-heavy top
-        patt = M.dot(1 << np.arange(M.shape[1])[::-1])
-        order = np.lexsort((patt, M.sum(1)))[::-1]
-        fs.binary_raster(axc, M, col_colors, row_order=order)
-        axc.set_xticks(np.arange(len(cols)) + 0.5)
-        axc.set_xticklabels([COMMON_SHORT[n] for n in cols], rotation=20,
-                            ha="right", fontsize=7.0)
-        axc.set_yticks([0, M.shape[0]])
-        axc.set_yticklabels(["200", "1"], fontsize=7)
-        axc.set_ylabel("episode (sorted by pattern)", fontsize=8)
-        for s in ("top", "right"):
-            axc.spines[s].set_visible(False)
-        axc.grid(False)
-        # right-margin: how many episodes have >=1 conflict, and all-clear
+        labels = [COMMON_SHORT[n] for n in cols]
+        items = fs.conflict_pattern_bars(axc_bar, axc_dot, M, col_colors,
+                                         labels, max_patterns=12)
+        axc_bar.set_xlabel("episodes", fontsize=8)
         n_any = int((M.sum(1) > 0).sum())
-        axc.annotate(f"{n_any}/200 with $\\geq$1 conflict",
-                     (1.0, 1.015), xycoords="axes fraction", ha="right",
-                     va="bottom", fontsize=7.0, color="0.25")
-    fs.panel_label(axc, "(c)")
+        axc_dot.set_title(f"{n_any}/200 conflicting", fontsize=7.5,
+                          color="0.25", pad=3)
+    fs.panel_label(axc_dot, "(c)", x=-0.05, y=1.05)
 
     out = os.path.join(OUT, "fig03_ade_cr.pdf")
     fig.savefig(out, bbox_inches="tight")

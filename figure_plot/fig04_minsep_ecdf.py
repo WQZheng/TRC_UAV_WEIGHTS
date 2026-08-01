@@ -63,60 +63,60 @@ def main():
             if raw in ARMMAP:
                 arms[ARMMAP[raw]] = np.asarray(d[k], float)
 
-    fig, ax = plt.subplots(figsize=(6.6, 4.0))
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
 
     # ---- MAIN: ECDF --------------------------------------------------------
-    for name in fs.ordered(arms.keys()):
+    order = fs.ordered(arms.keys())
+    pr30 = {}
+    for name in order:
         xs, ys = ecdf(arms[name])
         s = fs.STYLE[name]
         warm = s["family"] == "free"
         ax.plot(xs, ys, color=s["color"], ls=s["ls"],
                 lw=2.0 if warm else 1.35, label=name, zorder=3)
+        pr30[name] = float(np.mean(arms[name] < fs.THRESH))
     ax.axvline(fs.THRESH, **fs.THRESH_KW)
-    ax.annotate("30 m", (fs.THRESH, 0.92), xytext=(3, 0),
+    ax.annotate("30 m", (fs.THRESH, 0.955), xytext=(3, 0),
                 textcoords="offset points", fontsize=8, color="#D55E00")
-    ax.set_xlim(5, 78); ax.set_ylim(0, 1)
+    ax.set_xlim(5, 82); ax.set_ylim(0, 1.0)
     ax.set_xlabel("Minimum realized separation (m)")
     ax.set_ylabel("Cumulative fraction of encounters")
     fs.panel_label(ax, "(a)", x=-0.01, y=1.02)
-    ax.legend(loc="lower right", frameon=False, fontsize=7.6,
-              labelspacing=0.3, handletextpad=0.5, borderaxespad=0.6)
+    ax.legend(loc="center right", frameon=False, fontsize=7.6,
+              labelspacing=0.3, handletextpad=0.5, borderaxespad=0.6,
+              bbox_to_anchor=(1.0, 0.44))
 
-    # ---- INSET 1: 30 m neighbourhood zoom (lower-centre) -------------------
-    iax = ax.inset_axes([0.30, 0.12, 0.30, 0.40])
+    # right-edge summary strip: Pr(min-sep < 30 m) = each arm's conflict rate,
+    # pinning the quantitative threshold conclusion directly onto the figure.
+    ax.text(1.015, 0.99, r"Pr($<$30 m)", transform=ax.transAxes, fontsize=7,
+            color="0.3", ha="left", va="top")
+    for i, name in enumerate(order):
+        s = fs.STYLE[name]
+        ax.text(1.015, 0.90 - i * 0.052, f"{100*pr30[name]:4.1f}%",
+                transform=ax.transAxes, fontsize=7.2, color=s["color"],
+                ha="left", va="top", family="monospace")
+
+    # ---- INSET: single 30 m neighbourhood zoom (lower-right, clear area) ---
+    iax = ax.inset_axes([0.60, 0.10, 0.34, 0.40])
     for name in INSET_ARMS:
         if name in arms:
             xs, ys = ecdf(arms[name])
             s = fs.STYLE[name]
-            iax.plot(xs, ys, color=s["color"], ls=s["ls"], lw=1.25)
+            iax.plot(xs, ys, color=s["color"], ls=s["ls"], lw=1.3)
+    if "Vanilla-MPC" in arms:
+        xs, ys = ecdf(arms["Vanilla-MPC"])
+        iax.plot(xs, ys, color=fs.STYLE["Vanilla-MPC"]["color"], ls="--", lw=1.7)
     iax.axvline(fs.THRESH, **fs.THRESH_KW)
-    iax.set_xlim(25, 35); iax.set_ylim(0.05, 0.20)
-    iax.set_xlabel("30 m zoom", fontsize=7, labelpad=1)
+    iax.set_xlim(24, 40); iax.set_ylim(0, 0.5)
+    iax.set_title("30 m zoom", fontsize=7, pad=2)
     iax.tick_params(labelsize=6.5)
     iax.grid(True, color="0.9", lw=0.5)
-    fs.panel_label(iax, "(b)", x=-0.05, y=1.02)
-
-    # ---- INSET 2: stacked half-violins (upper-left, secondary) -------------
-    vax = ax.inset_axes([0.055, 0.50, 0.30, 0.46])
-    order = [n for n in fs.ordered(arms.keys())]
-    for i, name in enumerate(order):
-        s = fs.STYLE[name]
-        fs.half_violin(vax, arms[name], y0=i, color=s["color"], width=0.72,
-                       side="right", alpha=0.5, lw=0.7)
-    vax.axvline(fs.THRESH, color="#D55E00", ls=":", lw=0.9, zorder=5)
-    vax.set_xlim(5, 78)
-    vax.set_ylim(-0.6, len(order) + 0.1)
-    vax.set_yticks([])
-    vax.set_xticks([30, 60]); vax.tick_params(labelsize=6.5)
-    vax.set_xlabel("min-sep (m)", fontsize=7, labelpad=1)
-    for sp in ("left", "right", "top"):
-        vax.spines[sp].set_visible(False)
-    vax.grid(False)
-    fs.panel_label(vax, "(c)", x=-0.03, y=1.01)
+    fs.panel_label(iax, "(b)", x=-0.05, y=1.06)
 
     out = os.path.join(OUT, "fig04_minsep_ecdf.pdf")
     fig.savefig(out, bbox_inches="tight")
-    print("wrote", out, "| arms:", list(arms.keys()))
+    print("wrote", out, "| Pr(<30m):",
+          {k: round(100 * v, 1) for k, v in pr30.items()})
 
 
 if __name__ == "__main__":

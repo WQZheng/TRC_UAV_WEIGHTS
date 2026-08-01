@@ -94,12 +94,41 @@ def main():
     ax.set_ylabel("Conflict rate, CR (%)")
     ax.set_ylim(0, 65)
     ax.set_xlim(10, 65)
-    fs.panel_label(ax, "")   # single panel, no letter
+    fs.panel_label(ax, "(a)")
     ax.legend(loc="center left", bbox_to_anchor=(1.005, 0.5), frameon=False,
               fontsize=8, handletextpad=0.4, labelspacing=0.35)
+
+    # ---- INSET (b): certificate-cluster zoom -------------------------------
+    # The five certificate arms overlap near (effort~52, CR~11-12) and are
+    # unreadable in the full view; a local zoom pulls them apart. Same data,
+    # true magnification -- no size/density re-encoding.
+    cert = [n for n in ROW if fs.STYLE[n]["family"] in ("cert", "ref")
+            and n in ROW]
+    ex = [ROW[n][0] for n in cert]; ey = [ROW[n][1] for n in cert]
+    x0, x1 = min(ex) - 2.5, max(ex) + 3.0
+    y0, y1 = min(ey) - 1.5, max(ey) + 2.0
+    iax = ax.inset_axes([0.40, 0.44, 0.40, 0.42])
+    for name in cert:
+        eff, cr, k = ROW[name]
+        lo, hi = fs.wilson_ci(k, N)
+        s = fs.STYLE[name]; kw = fs.marker_kw(name)
+        iax.errorbar(eff, cr, yerr=[[cr - lo], [hi - cr]],
+                     xerr=(1.96 * se[name] if name in se else None),
+                     capsize=2.0, elinewidth=0.9, ls="none", color=s["color"],
+                     zorder=3)
+        iax.plot(eff, cr, marker=kw["marker"], ls="none", ms=8,
+                 color=s["color"], mfc=kw.get("mfc", s["color"]),
+                 mec=kw.get("mec", s["color"]), mew=kw.get("mew", 0.8), zorder=4)
+    iax.set_xlim(x0, x1); iax.set_ylim(y0, y1)
+    iax.set_title("certificate-arm zoom", fontsize=7, pad=2)
+    iax.tick_params(labelsize=6.5); iax.grid(True, color="0.9", lw=0.5)
+    ax.indicate_inset_zoom(iax, edgecolor="0.5", lw=0.8, alpha=0.7)
+    fs.panel_label(iax, "(b)", x=-0.06, y=1.08)
+
     out = os.path.join(OUT, "fig05_effort_cr.pdf")
     fig.savefig(out, bbox_inches="tight"); print("wrote", out,
-                "| effort SE from collector:", bool(se))
+                "| effort SE from collector:", bool(se), "| cert zoom arms:",
+                len(cert))
 
 
 if __name__ == "__main__":
