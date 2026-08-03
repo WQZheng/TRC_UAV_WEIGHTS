@@ -19,7 +19,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import FancyArrowPatch
 
 plt.rcParams.update({
     "font.family": "DejaVu Sans",
@@ -58,8 +57,8 @@ def wilson_ci(k, n=N, z=1.959963984540054):
     return (center - half) * 100.0, (center + half) * 100.0
 
 
-# apply 4% display jitter to the two ADE=20.90 arms (for visibility only)
-ADE_JITTER = {"Fixed-Predictor": 0.96, "Conformal-MPC": 1.04}
+# apply ~7% display jitter to the two ADE=20.90 arms (for visibility only)
+ADE_JITTER = {"Fixed-Predictor": 0.93, "Conformal-MPC": 1.07}
 
 fig, ax = plt.subplots(figsize=(7.6, 5.4))
 
@@ -67,13 +66,14 @@ fig, ax = plt.subplots(figsize=(7.6, 5.4))
 ax.axhspan(11.0, 12.5, xmin=0.0, xmax=1.0, color="#BBBBBB", alpha=0.16, zorder=0)
 
 # ---------- vertical matched contrast Stage-2 -> Vanilla -------------
+# bracket (two-end ticks) instead of arrow: it is a difference, not a flow
 ax.plot([4.3212, 4.3212], [11.0, 41.0], linestyle=(0, (4, 3)),
         color="#888888", linewidth=1.0, zorder=1.6)
-arr = FancyArrowPatch((4.3212, 14.0), (4.3212, 38.0),
-                      arrowstyle="-|>", mutation_scale=8,
-                      color="#888888", linewidth=1.0, zorder=1.7)
-ax.add_patch(arr)
-ax.text(4.55, 26.0, "Same predictor,\ncertificate removed\n$\\Delta$CR = +30.0 pp",
+ax.plot([4.3212 - 0.18, 4.3212 + 0.18], [11.0, 11.0], color="#888888",
+        linewidth=1.0, zorder=1.7)
+ax.plot([4.3212 - 0.18, 4.3212 + 0.18], [41.0, 41.0], color="#888888",
+        linewidth=1.0, zorder=1.7)
+ax.text(4.55, 26.0, "Same predictor,\nCBF layer removed\n$\\Delta$CR = +30.0 pp",
         ha="left", va="center", fontsize=7.5, color="#555555", zorder=2)
 
 # ---------- common-planner bracket above the cluster ------------------
@@ -136,12 +136,12 @@ for (label, ade, cr, k, col, mk, group, cert) in ARMS:
                 textcoords="offset points", ha=cfg["ha"], va=cfg["va"],
                 fontsize=8, color=tcol, arrowprops=ap, zorder=6)
 
-# ---------- Cochran corner box (right) -------------------------------
+# ---------- Cochran corner box (right, lightweight) -------------------
 ax.text(0.985, 0.965,
-        "Common-planner comparison\nCochran\u2019s $Q$ = 5.00\n"
-        "$df$ = 3,  $p$ = 0.172\n4 common-planner arms",
-        transform=ax.transAxes, ha="right", va="top", fontsize=7.7,
-        bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="#CCCCCC", lw=0.7),
+        "Common-planner comparison\nCochran\u2019s $Q$ = 5.00,  $df$ = 3\n"
+        "$p$ = 0.172,  $n$ = 200\n4 common-planner arms",
+        transform=ax.transAxes, ha="right", va="top", fontsize=7.5,
+        bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#DDDDDD", lw=0.5),
         zorder=7)
 
 # ---------- encoding legend (left, two rows only) --------------------
@@ -160,8 +160,10 @@ ax.legend(handles=leg_handles, loc="upper left", frameon=True,
 ax.set_xscale("log")
 ax.set_xlim(0.5, 35)
 ax.set_ylim(0, 60)
-ax.set_xlabel("Displacement error  ADE  (m, log scale)")
-ax.set_ylabel("Conflict rate  CR  (%)")
+ax.set_xticks([1, 2, 5, 10, 20])
+ax.set_xticklabels([r"$1$", r"$2$", r"$5$", r"$10$", r"$20$"])
+ax.set_xlabel("Average displacement error, ADE (m; log scale)")
+ax.set_ylabel("Conflict rate, CR (%)")
 ax.grid(axis="y", linestyle="--", linewidth=0.5, color="#CCCCCC",
         alpha=0.7, zorder=0)
 ax.set_axisbelow(True)
