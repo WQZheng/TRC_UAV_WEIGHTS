@@ -76,23 +76,13 @@ ax.plot([4.3212 - 0.18, 4.3212 + 0.18], [41.0, 41.0], color="#888888",
 ax.text(4.55, 26.0, "Same predictor,\nCBF layer removed\n$\\Delta$CR = +30.0 pp",
         ha="left", va="center", fontsize=7.5, color="#555555", zorder=2)
 
-# ---------- common-planner bracket above the cluster ------------------
-y_br = 14.3
-ax.annotate("", xy=(20.8964, y_br), xytext=(0.8279, y_br),
-            arrowprops=dict(arrowstyle="-", color="#999999", lw=0.9,
-                            shrinkA=0, shrinkB=0), zorder=2)
-ax.plot([0.8279, 0.8279], [y_br, y_br - 0.45], color="#999999", lw=0.9, zorder=2)
-ax.plot([20.8964, 20.8964], [y_br, y_br - 0.45], color="#999999", lw=0.9, zorder=2)
-ax.text(np.sqrt(0.8279 * 20.8964), y_br + 0.55,
-        "common planner, different predictors", ha="center", va="bottom",
-        fontsize=7.5, color="#555555", zorder=2)
-
-# ---------- 25x ADE range bracket along the bottom -------------------
+# ---------- 25x ADE range bracket + common-planner tag (bottom) -------
 y_bb = 5.5
 ax.annotate("", xy=(20.8964, y_bb), xytext=(0.8279, y_bb),
             arrowprops=dict(arrowstyle="<->", color="#444444", lw=1.1,
                             shrinkA=0, shrinkB=0), zorder=3)
-ax.text(np.sqrt(0.8279 * 20.8964), 4.3, "25\u00d7 ADE range",
+ax.text(np.sqrt(0.8279 * 20.8964), 4.5,
+        "25\u00d7 ADE range\ncommon planner, different predictors",
         ha="center", va="top", fontsize=8, color="#444444", zorder=3)
 
 # ---------- plot arms ------------------------------------------------
@@ -114,11 +104,12 @@ for (label, ade, cr, k, col, mk, group, cert) in ARMS:
 
 # ---------- direct labels (uniform weight; no bolding) ----------------
 LAB = {
-    "Constant-Velocity": dict(xy=(-12, 10), ha="right",  va="center", conn=False),
+    "Constant-Velocity": dict(xy=(0, 11),  ha="center", va="bottom", conn=False,
+                              line2="training-free, most accurate"),
     "Stage-1b":          dict(xy=(12, 5),  ha="left",   va="center", conn=False),
     "Stage-2 (ours)":    dict(xy=(0, -20), ha="center", va="top",    conn=True),
-    "Fixed-Predictor":   dict(xy=(13, 7),  ha="left",   va="center", conn=True),
-    "Conformal-MPC":     dict(xy=(13, -14),ha="left",   va="center", conn=True),
+    "Fixed-Predictor":   dict(xy=(-9, 8),  ha="right",  va="center", conn=True),
+    "Conformal-MPC":     dict(xy=(-9, -12),ha="right",  va="center", conn=True),
     "Vanilla-MPC":       dict(xy=(13, 0),  ha="left",   va="center", conn=True),
     "Soft-IPP":          dict(xy=(13, 5),  ha="left",   va="center", conn=True),
 }
@@ -135,6 +126,12 @@ for (label, ade, cr, k, col, mk, group, cert) in ARMS:
     ax.annotate(label, xy=(ade_p, cr), xytext=cfg["xy"],
                 textcoords="offset points", ha=cfg["ha"], va=cfg["va"],
                 fontsize=8, color=tcol, arrowprops=ap, zorder=6)
+    if cfg.get("line2"):
+        ax.annotate(cfg["line2"], xy=(ade_p, cr),
+                    xytext=(cfg["xy"][0], cfg["xy"][1] - 13),
+                    textcoords="offset points", ha=cfg["ha"],
+                    va="bottom", fontsize=6.8, color="#888888",
+                    style="italic", zorder=6)
 
 # ---------- Cochran corner box (right, lightweight) -------------------
 ax.text(0.985, 0.965,
