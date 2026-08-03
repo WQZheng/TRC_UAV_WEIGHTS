@@ -5,19 +5,13 @@ Single-panel ADE-CR scatter for 7 experimental arms (n=200, seed 12345,
 held-out GUAM encounters 2500-2999, tuned CBF-MPC planner: alpha=0.1,
 Hp=15, a_max=20).
 
-Two orthogonal, non-redundant encoding dimensions:
-  saturation  high = 4 common-planner arms (the paired comparison);
-              low  = 3 other arms (margin planner / certificate-free).
-  marker fill filled = CBF certificate present; open = certificate-free.
-
-Wilson 95% CI on the conflict rate for every arm. The four common-planner
-arms are statistically indistinguishable (Cochran Q = 5.00, df = 3,
-p = 0.172; pairwise McNemar, Holm-adjusted p = 1.00) across a 25x ADE
-range -- the central decoupling claim.
+Cross argument:
+  horizontal -- 4 common-planner arms span 25x ADE (0.83 -> 20.90 m) at
+               CR 11.0-12.5%, Cochran Q=5.00 p=0.172 (no difference).
+  vertical   -- Stage-2 vs Vanilla-MPC, same predictor (ADE=4.32 m),
+               certificate removed: CR 11.0 -> 41.0%, +30.0 pp.
 
 Authoritative source: lab BEST.txt / result.json / STATS.txt (n=200).
-No external data file is read; every number is hard-coded from the
-verified lab products.
 """
 import os
 import numpy as np
@@ -25,10 +19,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrowPatch
 
-# ----------------------------------------------------------------------
-# publication rc (matches the v4 figure-style hierarchy)
-# ----------------------------------------------------------------------
 plt.rcParams.update({
     "font.family": "DejaVu Sans",
     "font.size": 9,
@@ -43,11 +35,9 @@ plt.rcParams.update({
     "ps.fonttype": 42,
 })
 
-# ----------------------------------------------------------------------
-# authoritative numbers (lab-verified, n=200, seed 12345)
 # (label, ADE_m, CR%, conflicts k, color, marker, group, has_cert)
 # group 'common' = same tuned planner, only predictor differs
-# ----------------------------------------------------------------------
+# jitter applied below for the two arms sharing ADE=20.90
 ARMS = [
     ("Constant-Velocity", 0.8279, 12.0, 24, "#7A7A7A", "h", "common", True),
     ("Stage-1b",           1.8400, 11.5, 23, "#009E73", "D", "common", True),
@@ -61,7 +51,6 @@ N = 200
 
 
 def wilson_ci(k, n=N, z=1.959963984540054):
-    """Wilson score 95% interval for a binomial proportion."""
     p = k / n
     den = 1.0 + z * z / n
     center = (p + z * z / (2 * n)) / den
@@ -69,84 +58,105 @@ def wilson_ci(k, n=N, z=1.959963984540054):
     return (center - half) * 100.0, (center + half) * 100.0
 
 
-# label offset in points: (dx, dy, ha, draw_connector)
-OFFS = {
-    "Constant-Velocity": (-9, -17, "right", True),
-    "Stage-1b":          (12,  -2, "left",  False),
-    "Stage-2 (ours)":    (-7, -19, "right", True),
-    "Fixed-Predictor":   (10,   9, "left",  False),
-    "Conformal-MPC":     (10, -15, "left",  False),
-    "Vanilla-MPC":       (12,  -3, "left",  False),
-    "Soft-IPP":          (12,   4, "left",  False),
-}
+# apply 4% display jitter to the two ADE=20.90 arms (for visibility only)
+ADE_JITTER = {"Fixed-Predictor": 0.96, "Conformal-MPC": 1.04}
 
-fig, ax = plt.subplots(figsize=(7.4, 5.2))
+fig, ax = plt.subplots(figsize=(7.6, 5.4))
 
-# -- shaded CR band for the certificate cluster -----------------------
-ax.axhspan(11.0, 12.5, color="#BBBBBB", alpha=0.20, zorder=0)
-ax.text(0.56, 11.75, "CR 11.0\u201312.5%", color="#555555", fontsize=8,
-        ha="left", va="center", zorder=1)
+# ---------- gray descriptive band: common-planner observed CR range ---
+ax.axhspan(11.0, 12.5, xmin=0.0, xmax=1.0, color="#BBBBBB", alpha=0.16, zorder=0)
 
-# -- plot: others first (lower zorder), common arms on top ------------
-for order in ("other", "common"):
-    for (label, ade, cr, k, col, mk, group, cert) in ARMS:
-        if group != order:
-            continue
-        common = (group == "common")
-        sat = 1.0 if common else 0.42
-        lo, hi = wilson_ci(k)
-        ecol = col if common else "#9A9A9A"
-        elw = 1.8 if common else 1.0
-        # Wilson CI error bar
-        ax.errorbar(ade, cr, yerr=[[cr - lo], [hi - cr]], fmt="none",
-                    ecolor=ecol, elinewidth=elw, capsize=4, capthick=elw,
-                    alpha=sat, zorder=2.5)
-        # marker
-        face = col if cert else "white"
-        ms = 175 if label == "Stage-2 (ours)" else (135 if common else 80)
-        ax.scatter([ade], [cr], s=ms, marker=mk, facecolors=face,
-                   edgecolors=col, linewidths=(1.3 if cert else 1.7),
-                   zorder=4, alpha=sat)
+# ---------- vertical matched contrast Stage-2 -> Vanilla -------------
+ax.plot([4.3212, 4.3212], [11.0, 41.0], linestyle=(0, (4, 3)),
+        color="#888888", linewidth=1.0, zorder=1.6)
+arr = FancyArrowPatch((4.3212, 14.0), (4.3212, 38.0),
+                      arrowstyle="-|>", mutation_scale=8,
+                      color="#888888", linewidth=1.0, zorder=1.7)
+ax.add_patch(arr)
+ax.text(4.55, 26.0, "Same predictor,\ncertificate removed\n$\\Delta$CR = +30.0 pp",
+        ha="left", va="center", fontsize=7.5, color="#555555", zorder=2)
 
-# -- direct labels with thin connectors where offset is large ----------
-for (label, ade, cr, k, col, mk, group, cert) in ARMS:
-    dx, dy, ha, conn = OFFS[label]
-    common = (group == "common")
-    tcol = "#222222" if common else "#666666"
-    weight = "bold" if label == "Stage-2 (ours)" else "normal"
-    ap = dict(arrowstyle="-", color="#9A9A9A", lw=0.6,
-              shrinkA=2, shrinkB=3) if conn else None
-    ax.annotate(label, xy=(ade, cr), xytext=(dx, dy),
-                textcoords="offset points", ha=ha, va="center",
-                fontsize=8 if common else 7.5, color=tcol, weight=weight,
-                arrowprops=ap, zorder=6)
-
-# -- 25x ADE range bracket along the bottom ----------------------------
-y_br = 5.3
+# ---------- common-planner bracket above the cluster ------------------
+y_br = 14.3
 ax.annotate("", xy=(20.8964, y_br), xytext=(0.8279, y_br),
+            arrowprops=dict(arrowstyle="-", color="#999999", lw=0.9,
+                            shrinkA=0, shrinkB=0), zorder=2)
+ax.plot([0.8279, 0.8279], [y_br, y_br - 0.45], color="#999999", lw=0.9, zorder=2)
+ax.plot([20.8964, 20.8964], [y_br, y_br - 0.45], color="#999999", lw=0.9, zorder=2)
+ax.text(np.sqrt(0.8279 * 20.8964), y_br + 0.55,
+        "common planner, different predictors", ha="center", va="bottom",
+        fontsize=7.5, color="#555555", zorder=2)
+
+# ---------- 25x ADE range bracket along the bottom -------------------
+y_bb = 5.5
+ax.annotate("", xy=(20.8964, y_bb), xytext=(0.8279, y_bb),
             arrowprops=dict(arrowstyle="<->", color="#444444", lw=1.1,
                             shrinkA=0, shrinkB=0), zorder=3)
-ax.text(np.sqrt(0.8279 * 20.8964), 4.0, "25\u00d7 ADE range",
+ax.text(np.sqrt(0.8279 * 20.8964), 4.3, "25\u00d7 ADE range",
         ha="center", va="top", fontsize=8, color="#444444", zorder=3)
 
-# -- Cochran corner box (right) ---------------------------------------
-ax.text(0.985, 0.965, "Cochran Q = 5.00\n(df = 3,  p = 0.172)",
-        transform=ax.transAxes, ha="right", va="top", fontsize=8,
+# ---------- plot arms ------------------------------------------------
+for (label, ade, cr, k, col, mk, group, cert) in ARMS:
+    common = (group == "common")
+    sat = 1.0 if common else 0.42
+    ade_p = ADE_JITTER.get(label, 1.0) * ade
+    lo, hi = wilson_ci(k)
+    ecol = col if common else "#9A9A9A"
+    elw = 1.8 if common else 1.0
+    ax.errorbar(ade_p, cr, yerr=[[cr - lo], [hi - cr]], fmt="none",
+                ecolor=ecol, elinewidth=elw, capsize=4, capthick=elw,
+                alpha=sat, zorder=2.5)
+    face = col if cert else "white"
+    ms = 95
+    ax.scatter([ade_p], [cr], s=ms, marker=mk, facecolors=face,
+               edgecolors=col, linewidths=(1.3 if cert else 1.7),
+               zorder=4, alpha=sat)
+
+# ---------- direct labels (uniform weight; no bolding) ----------------
+LAB = {
+    "Constant-Velocity": dict(xy=(-12, 10), ha="right",  va="center", conn=False),
+    "Stage-1b":          dict(xy=(12, 5),  ha="left",   va="center", conn=False),
+    "Stage-2 (ours)":    dict(xy=(0, -20), ha="center", va="top",    conn=True),
+    "Fixed-Predictor":   dict(xy=(13, 7),  ha="left",   va="center", conn=True),
+    "Conformal-MPC":     dict(xy=(13, -14),ha="left",   va="center", conn=True),
+    "Vanilla-MPC":       dict(xy=(13, 0),  ha="left",   va="center", conn=True),
+    "Soft-IPP":          dict(xy=(13, 5),  ha="left",   va="center", conn=True),
+}
+for (label, ade, cr, k, col, mk, group, cert) in ARMS:
+    common = (group == "common")
+    sat = 1.0 if common else 0.42
+    ade_p = ADE_JITTER.get(label, 1.0) * ade
+    tcol = "#222222" if common else "#666666"
+    cfg = LAB[label]
+    ap = None
+    if cfg["conn"]:
+        ap = dict(arrowstyle="-", color="#9A9A9A", lw=0.5,
+                  shrinkA=2, shrinkB=3)
+    ax.annotate(label, xy=(ade_p, cr), xytext=cfg["xy"],
+                textcoords="offset points", ha=cfg["ha"], va=cfg["va"],
+                fontsize=8, color=tcol, arrowprops=ap, zorder=6)
+
+# ---------- Cochran corner box (right) -------------------------------
+ax.text(0.985, 0.965,
+        "Common-planner comparison\nCochran\u2019s $Q$ = 5.00\n"
+        "$df$ = 3,  $p$ = 0.172\n4 common-planner arms",
+        transform=ax.transAxes, ha="right", va="top", fontsize=7.7,
         bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="#CCCCCC", lw=0.7),
         zorder=7)
 
-# -- certificate legend (left) ----------------------------------------
+# ---------- encoding legend (left, two rows only) --------------------
 leg_handles = [
-    Line2D([0], [0], marker="o", color="w", markerfacecolor="#777777",
-           markeredgecolor="#777777", markersize=9, label="CBF certificate (filled)"),
+    Line2D([0], [0], marker="o", color="w", markerfacecolor="#666666",
+           markeredgecolor="#666666", markersize=9,
+           label="CBF-constrained planner"),
     Line2D([0], [0], marker="o", color="w", markerfacecolor="white",
-           markeredgecolor="#777777", markersize=9, markeredgewidth=1.6,
-           label="certificate-free (open)"),
+           markeredgecolor="#666666", markersize=9, markeredgewidth=1.6,
+           label="Certificate-free planner"),
 ]
 ax.legend(handles=leg_handles, loc="upper left", frameon=True,
           framealpha=0.92, edgecolor="#CCCCCC", handletextpad=0.4)
 
-# -- axes -------------------------------------------------------------
+# ---------- axes ------------------------------------------------------
 ax.set_xscale("log")
 ax.set_xlim(0.5, 35)
 ax.set_ylim(0, 60)
@@ -158,7 +168,6 @@ ax.set_axisbelow(True)
 
 fig.tight_layout()
 
-# -- save -------------------------------------------------------------
 here = os.path.dirname(os.path.abspath(__file__))
 out_dir = os.path.normpath(os.path.join(here, "..", "figures_v1"))
 os.makedirs(out_dir, exist_ok=True)
