@@ -272,10 +272,16 @@
         "claim": "The wind sweep covered all six arms.",
         "why_it_appealed": "The log showed no error and every assertion passed.",
         "how_it_died": "wind_sweep_v2.npz held five arms. The Soft-IPP path was wrong and its try/except turned that into a skip. Assertions ran over the arms that existed, so they could not notice the missing one."
+      },
+      {
+        "claim": "A hand-written Newcombe method-10 interval was fit for the binary rows.",
+        "why_it_appealed": "Newcombe method 10 is the standard unconditional interval for a paired risk difference, and the formula looked right.",
+        "how_it_died": "Two independent checks. It missed Newcombe's own published worked example (n=48, b=12, c=5: computed [-0.2553,-0.0527] against the published [-0.2883,-0.0190], about 70% of the correct width), and it put the delay-2 row (b=5,c=1) entirely below zero while that row's exact McNemar p is 0.22 -- the figure would have claimed a difference the text calls non-significant. The correlation term had been written from memory. Replaced by an exact conditional interval, whose Clopper-Pearson core was first checked against three published values (b=2/m=10, b=0/m=10, b=1/m=20) and matched all three digit for digit."
       }
     ],
     "rule": "An arithmetic coincidence is a hypothesis about the code, not evidence about it. Read the call site, then measure. Three of the four diagnoses above were arithmetically or structurally attractive and all were killed by one grep or one measurement.",
-    "rule_2": "Never wrap data production in try/except. A wrong path must crash, not degrade into absent data: no assertion can fire on a record that was never written."
+    "rule_2": "Never wrap data production in try/except. A wrong path must crash, not degrade into absent data: no assertion can fire on a record that was never written.",
+    "rule_3": "Before plotting any computed interval, check the implementation against a published worked example AND against an independent order-of-magnitude estimate. This defect was caught because a rough estimate of about +/-2.4 pp had been stated in advance and the implementation disagreed with it; that cross-check cost minutes, whereas a post-hoc audit of a published figure would not."
   },
   "wind_sweep_v2": {
     "grid_eta_w": [
@@ -367,5 +373,58 @@
     },
     "canonical_point_assertion": "wind_sweep(eta=0.3) conflict vectors are ELEMENTWISE identical to conflict_vectors_v2 for all four common-planner arms. This replaces the manuscript's earlier explanation of a half-point offset as 'independent resampling': the offset was caused by the old sweep starting at eta=0.5, a 67% stronger field, and with the canonical point in the grid there is no offset left to explain.",
     "soft_ipp_backfill": "The first sweep ran five arms, not six. Soft-IPP was constructed inside a try/except pointing at {PLANGRAD_DIR}/soft_joint.pt, but that checkpoint lives in code/baselines/04_soft_ipp/. The except branch logged a warning and dropped the arm, so a wrong path degraded into a silently missing arm -- a self-check cannot fire on data that was never produced. Backfilled by patch_softipp_wind.py, which appends only and then re-verifies that all 62 pre-existing arrays are byte-identical. Its eta=0.3 point reproduces Table 1 (CR 53.0, Energy 16.975)."
+  },
+  "matched_pair_v2": {
+    "purpose": "Fig. 7, replacing the tab:stage1b scorecard.",
+    "max_lateral_offset_provenance": "Produced by importing p2_mcnemar_dev.rollout, the byte-identical function that wrote DEV_MATCHED_S1B.txt, rather than re-implementing the cross-track geometry inside evaluate_policy (which would have been a third rollout implementation). Audited: the weights in Round1/04_weights have the same md5 as the plangrad weights dir; the cached arrays give S1b 103.0183 +/- 16.8405 and S2 103.5336 +/- 11.2749, matching the txt's 103.02 +/- 16.84 and 103.53 +/- 11.27; ETA_W=0.3, wind seed 7, encounter seed 12345, pool 2500-3000.",
+    "critical_value_discipline": "The two source txts used DIFFERENT critical values and both must be honoured to reproduce them: EFF_MATCHED_S1B.txt used Student-t (t_crit(0.975,199)=1.972), DEV_MATCHED_S1B.txt reused p2_mcnemar_dev.paired_diff_ci with z=1.96. tab:stage1b's min-sep interval is the t interval (z would give [-0.3473,+0.2653], not the published [-0.35,+0.27]).",
+    "reproduced": {
+      "minsep_m": [
+        -0.041,
+        -0.3492,
+        0.2671
+      ],
+      "effort": [
+        -0.5496,
+        -1.6824,
+        0.5832
+      ],
+      "max_lateral_offset_m": [
+        0.5153,
+        -1.1108,
+        2.1415
+      ]
+    },
+    "binary_interval_method": "Exact conditional interval for the paired risk difference: condition on the m=b+c discordant pairs, place a Clopper-Pearson interval on theta=b/m, and map through d=(1-2*theta)*m/n, a monotone linear map that carries the endpoints. Chosen over Newcombe's method 10 because the manuscript reports these five comparisons with exact McNemar tests and an unconditional approximation is not guaranteed to agree with a conditional test.",
+    "five_regime_intervals_pp": {
+      "nominal": [
+        -0.5,
+        -1.47,
+        1.22
+      ],
+      "mass +20%": [
+        0.5,
+        -1.22,
+        1.47
+      ],
+      "thrust eff 0.85": [
+        0.5,
+        -1.77,
+        2.24
+      ],
+      "actuator delay 2": [
+        -2.0,
+        -2.97,
+        0.85
+      ],
+      "combined": [
+        -1.0,
+        -1.0,
+        0.68
+      ]
+    },
+    "consistency_assertion": "Every interval spans zero if and only if the exact McNemar p exceeds 0.05. All five rows span zero (p = 1.00, 1.00, 1.00, 0.22, 0.50), as do all three continuous rows: 0 of 8 exclude zero.",
+    "boundary_note": "At b=m (the combined row, (2,0)) the Clopper-Pearson upper limit for theta is exactly 1, so the lower endpoint of d coincides with the point estimate. Correct exact-interval behaviour at the boundary, not a defect.",
+    "scope": "Closed-loop operational metrics only. ADE and critical-window error are prediction-space quantities and belong to Table 1 and tab:errdir; the exclusion is by quantity type, not by outcome."
   }
 }
