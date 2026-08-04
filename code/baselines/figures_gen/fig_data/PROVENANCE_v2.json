@@ -267,8 +267,105 @@
         "claim": "The 9th row of tab:mismatch had no provenance and was probably a separate ad-hoc run.",
         "why_it_appealed": "It is the only regime that alters gust_std.",
         "how_it_died": "It sits in the same regimes list at eval_mismatch.py:336; MISMATCH.txt contains 9 '### ' headers, not 8. The premise was a miscount."
+      },
+      {
+        "claim": "The wind sweep covered all six arms.",
+        "why_it_appealed": "The log showed no error and every assertion passed.",
+        "how_it_died": "wind_sweep_v2.npz held five arms. The Soft-IPP path was wrong and its try/except turned that into a skip. Assertions ran over the arms that existed, so they could not notice the missing one."
       }
     ],
-    "rule": "An arithmetic coincidence is a hypothesis about the code, not evidence about it. Read the call site, then measure. Three of the four diagnoses above were arithmetically or structurally attractive and all were killed by one grep or one measurement."
+    "rule": "An arithmetic coincidence is a hypothesis about the code, not evidence about it. Read the call site, then measure. Three of the four diagnoses above were arithmetically or structurally attractive and all were killed by one grep or one measurement.",
+    "rule_2": "Never wrap data production in try/except. A wrong path must crash, not degrade into absent data: no assertion can fire on a record that was never written."
+  },
+  "wind_sweep_v2": {
+    "grid_eta_w": [
+      0.3,
+      0.5,
+      1.0,
+      1.5
+    ],
+    "gust_std": 3.0,
+    "strength_note": "Disturbance strength is eta_w * gust_std. The grid spans 0.9 to 4.5, i.e. exactly five times the canonical 0.9. The canonical 0.3 point was ADDED to the grid so the sweep and the main table share an operating point.",
+    "multiples_of_canonical": {
+      "0.3": 1.0,
+      "0.5": 1.6667,
+      "1.0": 3.3333,
+      "1.5": 5.0
+    },
+    "n": 200,
+    "seed": 12345,
+    "wind_seed": 7,
+    "r_conf_calibration": "v2 (18.932)",
+    "per_arm": {
+      "PlanGrad": {
+        "CR_by_eta": {
+          "0.3": 11.0,
+          "0.5": 11.5,
+          "1.0": 11.5,
+          "1.5": 11.5
+        },
+        "dCR_pp": 0.5,
+        "dMinSep_m": 0.048998
+      },
+      "Stage-1b": {
+        "CR_by_eta": {
+          "0.3": 11.5,
+          "0.5": 11.5,
+          "1.0": 11.5,
+          "1.5": 12.0
+        },
+        "dCR_pp": 0.5,
+        "dMinSep_m": 0.033967
+      },
+      "Fixed-Predictor": {
+        "CR_by_eta": {
+          "0.3": 12.5,
+          "0.5": 12.0,
+          "1.0": 11.5,
+          "1.5": 12.0
+        },
+        "dCR_pp": 1.0,
+        "dMinSep_m": 0.048859
+      },
+      "Constant-Velocity": {
+        "CR_by_eta": {
+          "0.3": 12.0,
+          "0.5": 12.0,
+          "1.0": 12.0,
+          "1.5": 11.5
+        },
+        "dCR_pp": 0.5,
+        "dMinSep_m": 0.029285
+      },
+      "Vanilla-MPC": {
+        "CR_by_eta": {
+          "0.3": 41.0,
+          "0.5": 40.0,
+          "1.0": 40.5,
+          "1.5": 40.0
+        },
+        "dCR_pp": 1.0,
+        "dMinSep_m": 0.018377
+      },
+      "Soft-IPP": {
+        "CR_by_eta": {
+          "0.3": 53.0,
+          "0.5": 51.5,
+          "1.0": 51.5,
+          "1.5": 52.0
+        },
+        "dCR_pp": 1.5,
+        "dMinSep_m": 0.018216
+      }
+    },
+    "zero_effect_bounds": {
+      "max_dCR_pp_all_six_arms": 1.5,
+      "max_dCR_episodes_of_200": 3,
+      "max_dCR_pp_certificate_arms_only": 1.0,
+      "max_dMinSep_m": 0.048998,
+      "reading": "Across a five-fold increase in disturbance strength no arm moves by more than 1.5 pp in conflict rate (3 of 200 episodes) or 0.049 m in mean minimum separation. This is sampling noise at n=200, not a dose response, which is why the sweep is reported as a sentence and given no figure panel: drawing a zero effect as a trend line invites a slope that is not there."
+    },
+    "canonical_point_assertion": "wind_sweep(eta=0.3) conflict vectors are ELEMENTWISE identical to conflict_vectors_v2 for all four common-planner arms. This replaces the manuscript's earlier explanation of a half-point offset as 'independent resampling': the offset was caused by the old sweep starting at eta=0.5, a 67% stronger field, and with the canonical point in the grid there is no offset left to explain.",
+    "soft_ipp_backfill": "The first sweep ran five arms, not six. Soft-IPP was constructed inside a try/except pointing at {PLANGRAD_DIR}/soft_joint.pt, but that checkpoint lives in code/baselines/04_soft_ipp/. The except branch logged a warning and dropped the arm, so a wrong path degraded into a silently missing arm -- a self-check cannot fire on data that was never produced. Backfilled by patch_softipp_wind.py, which appends only and then re-verifies that all 62 pre-existing arrays are byte-identical. Its eta=0.3 point reproduces Table 1 (CR 53.0, Energy 16.975)."
   }
 }
