@@ -32,6 +32,7 @@ We evaluate, episode-aligned on the identical encounter stream:
 Writes P1_ORACLE_CONFLICTS.txt.
 """
 from __future__ import annotations
+import os
 import torch
 
 from seeding import set_seed
@@ -103,7 +104,7 @@ def rollout(kind, ckpt=None):
     dyn = EVTOLDynamics(DEFAULT_PARAMS, dtype=DTYPE, device=DEV)
     wind = UrbanWindField(eta_w=ETA_W, dtype=DTYPE, device=DEV, seed=7)
 
-    mins, slack_cpa = [], []
+    mins, slack_cpa, cpas = [], [], []
     for _ in range(N // BATCH):
         x0, nh, nf, _r, _f = gen.sample(BATCH, T, DEV)
         x = x0
@@ -111,6 +112,7 @@ def rollout(kind, ckpt=None):
         # track slack at the realized closest-approach step
         best_d = torch.full((BATCH,), 1e6, dtype=DTYPE, device=DEV)
         slack_here = torch.zeros(BATCH, dtype=DTYPE, device=DEV)
+        cpa_here = torch.zeros(BATCH, dtype=torch.long, device=DEV)
         for t in range(T):
             p0, v0 = x[:, 0:3], x[:, 3:6]
             tt = torch.arange(HP + 1, dtype=DTYPE, device=DEV) * DT
@@ -132,9 +134,11 @@ def rollout(kind, ckpt=None):
             upd = d < best_d
             best_d = torch.where(upd, d, best_d)
             slack_here = torch.where(upd, eps_scalar.to(DTYPE), slack_here)
+            cpa_here = torch.where(upd, torch.full_like(cpa_here, t), cpa_here)
         mins.append(min_sep.cpu())
         slack_cpa.append(slack_here.cpu())
-    return torch.cat(mins)[:N], torch.cat(slack_cpa)[:N]
+        cpas.append(cpa_here.cpu())
+    return torch.cat(mins)[:N], torch.cat(slack_cpa)[:N], torch.cat(cpas)[:N]
 
 
 if __name__ == "__main__":
@@ -146,8 +150,8 @@ if __name__ == "__main__":
       (T, DT, ETA_W, N))
     w("")
 
-    sep_s2, slack_s2 = rollout("real", "stage2_final.pt")
-    sep_or, slack_or = rollout("oracle")
+    sep_s2, slack_s2, cpa_s2 = rollout("real", "stage2_final.pt")
+    sep_or, slack_or, cpa_or = rollout("oracle")
 
     conf_s2 = sep_s2 < DSEP
     conf_or = sep_or < DSEP
@@ -176,6 +180,31 @@ if __name__ == "__main__":
             b_cnt += 1
         w("  %3d | %8.2f | %11.2f | %14.4f | %s" %
           (i, float(sep_s2[i]), float(sep_or[i]), sl, cls))
+    w("")
+    # ---- dump oracle_v2.npz (figure provenance; see FIG05 data request) ----
+    # episode_ids are the Stage-2 conflict indices in 0..199, so every figure
+    # panel and the 200-dim arm vectors can be aligned row-by-row.
+    import numpy as _np
+    _eid = _np.asarray(idx, dtype=_np.int64)
+    _figdd = os.environ.get("FIG_DATA_DIR", ".")
+    os.makedirs(_figdd, exist_ok=True)
+    _np.savez(os.path.join(_figdd, "oracle_v2.npz"),
+              episode_ids=_eid,
+              minsep_stage2=sep_s2[_eid].numpy().astype(_np.float64),
+              minsep_oracle=sep_or[_eid].numpy().astype(_np.float64),
+              oracle_slack_at_cpa=slack_or[_eid].numpy().astype(_np.float64),
+              oracle_cpa_step=cpa_or[_eid].numpy().astype(_np.int64),
+              stage2_cpa_step=cpa_s2[_eid].numpy().astype(_np.int64),
+              oracle_conflict_200=conf_or.numpy().astype(bool),
+              stage2_conflict_200=conf_s2.numpy().astype(bool))
+    w("  [dumped oracle_v2.npz: episode_ids/minsep_stage2/minsep_oracle/"
+      "oracle_slack_at_cpa/oracle_cpa_step/stage2_cpa_step/"
+      "oracle_conflict_200/stage2_conflict_200]")
+    # McNemar discordant structure vs Stage-2 over the FULL 200 episodes
+    _b = int((~conf_s2.numpy() & conf_or.numpy()).sum())
+    _c = int((conf_s2.numpy() & ~conf_or.numpy()).sum())
+    w("  oracle vs Stage-2 discordant (b=oracle-only, c=Stage-2-only) = "
+      "(%d, %d)" % (_b, _c))
     w("")
     w("SUMMARY of the %d Stage-2 conflict episodes:" % n_s2)
     w("  (A) actuation-limited / hard-infeasible under any prediction = %d" % a_cnt)

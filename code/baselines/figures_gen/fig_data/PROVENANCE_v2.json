@@ -116,5 +116,96 @@
       "cr_from_array": 11.5,
       "eval_model": "stage1_full.pt (frozen) + conformal-inflated CBF-MPC"
     }
+  },
+  "attribution_v2": {
+    "definition": "hard-infeasible(step) := minimum total CBF relaxation required at that step > 1e-3 m (1 mm). The relaxation is obtained from an ALWAYS-FEASIBLE QP that minimises total slack, so the verdict never depends on a solver status flag.",
+    "why_changed": "The previous zero-slack test used prob.status in ('optimal','optimal_inaccurate') and reported 391 infeasible cells. The 23 additional cells found here carry relaxations of 2.3e-2 to 2.60e+1 m (8 of them > 10 m), i.e. they were ECOS false negatives under 'optimal_inaccurate', not boundary jitter. 391 is wrong; 414 is correct.",
+    "epsilon_scan": {
+      "1e-12": 414,
+      "1e-10": 414,
+      "1e-09": 414,
+      "1e-08": 414,
+      "1e-07": 414,
+      "1e-06": 414,
+      "1e-05": 414,
+      "1e-04": 414,
+      "1e-03": 414,
+      "1e-02": 414,
+      "1e-01": 411,
+      "1e+00": 406
+    },
+    "epsilon_insensitive_interval_m": [
+      1e-12,
+      0.01
+    ],
+    "bimodality": {
+      "cells_below_1e-6": 26,
+      "median_of_those": 7.956086179447881,
+      "cells_above_1e-2": 414,
+      "cells_in_grey_band_1e-6_to_1e-2": 0
+    },
+    "counts": {
+      "infeasible_cells": 414,
+      "cells_total": 440,
+      "mean_per_row": 18.818181818181817,
+      "contiguous_single_run_rows": 22,
+      "column_counts": [
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        20,
+        20,
+        19,
+        18,
+        17,
+        17,
+        17
+      ],
+      "max_slack_m": 54.614989426422305
+    },
+    "cpa": {
+      "range": [
+        3,
+        6
+      ],
+      "all_cpa_steps_infeasible": true
+    },
+    "grading_breaks_m": [
+      1.0,
+      10.0
+    ]
+  },
+  "oracle_v2": {
+    "slack_threshold_used": 1e-06,
+    "three_smallest_slack": [
+      5.769821963273225e-11,
+      1.2253356744155896e-09,
+      1.341545349504351
+    ],
+    "threshold_insensitive_interval_m": [
+      1e-08,
+      0.1
+    ],
+    "active_slack_count": 20,
+    "zero_slack_episodes": [
+      117,
+      176
+    ],
+    "discordant_vs_stage2_b_c": [
+      2,
+      0
+    ],
+    "mcnemar_exact_p": 0.5,
+    "note": "oracle_slack_at_cpa is the ORACLE-REPLAY QP's relaxation slack, not Stage-2's. The text's '20 of the 22' refers to this quantity."
   }
 }

@@ -97,6 +97,59 @@ def noslack_feasible(prob, params, p0v, v0v, p_refv, neigh_pred_v):
     return prob.status in ("optimal", "optimal_inaccurate")
 
 
+
+# ============================================================================
+# Solver-independent reformulation: instead of asking ECOS "is the eps=0 QP
+# feasible?" (a status flag, tolerance-dependent), we solve the ALWAYS-FEASIBLE
+# program that minimises the total CBF relaxation needed. The step is
+# hard-infeasible iff that minimum relaxation exceeds a PHYSICAL threshold.
+# This turns a binary solver verdict into a continuous, comparable quantity.
+# ============================================================================
+def build_minslack_qp(Hp, dt, a_max, d_sep):
+    a = cp.Variable((Hp, 3))
+    p = cp.Variable((Hp + 1, 3))
+    v = cp.Variable((Hp + 1, 3))
+    eps = cp.Variable(Hp, nonneg=True)          # per-step CBF relaxation
+    p0 = cp.Parameter(3); v0 = cp.Parameter(3)
+    p_ref = cp.Parameter((Hp + 1, 3))
+    nrm = cp.Parameter((Hp + 1, 3)); bvec = cp.Parameter((Hp + 1,))
+    h0 = cp.Parameter(1)
+    cons = [p[0] == p0, v[0] == v0]
+    for k in range(Hp):
+        cons += [p[k + 1] == p[k] + dt * v[k],
+                 v[k + 1] == v[k] + dt * a[k]]
+        cons += [cp.norm(a[k], "inf") <= a_max]
+    h_prev = h0[0]
+    for k in range(1, Hp + 1):
+        h_k = nrm[k, :] @ p[k] - bvec[k] - d_sep
+        cons += [h_k + eps[k - 1] >= (1 - ALPHA) * h_prev]
+        h_prev = h_k
+    # Lexicographic intent: relaxation dominates; tracking only breaks ties.
+    obj = cp.Minimize(1e6 * cp.sum(eps)
+                      + cp.sum_squares(p - p_ref) + 0.05 * cp.sum_squares(a))
+    return cp.Problem(obj, cons), (p0, v0, p_ref, nrm, bvec, h0), eps
+
+
+def minslack_value(prob, params, epsvar, p0v, v0v, p_refv, neigh_pred_v):
+    """Return the minimum total CBF relaxation (metres) needed at this step."""
+    p0, v0, p_ref, nrm, bvec, h0 = params
+    diff = p_refv - neigh_pred_v
+    dist = np.linalg.norm(diff, axis=-1, keepdims=True).clip(1e-6)
+    nrm_v = diff / dist
+    bvec_v = (nrm_v * neigh_pred_v).sum(-1)
+    h0_v = float((nrm_v[0] * (p0v - neigh_pred_v[0])).sum() - DSEP)
+    p0.value = p0v; v0.value = v0v; p_ref.value = p_refv
+    nrm.value = nrm_v; bvec.value = bvec_v; h0.value = np.array([h0_v])
+    for sv in (cp.ECOS, cp.CLARABEL, cp.SCS):
+        try:
+            prob.solve(solver=sv, verbose=False)
+            if epsvar.value is not None:
+                return float(np.sum(np.maximum(epsvar.value, 0.0)))
+        except Exception:
+            continue
+    return float("nan")
+
+
 @torch.no_grad()
 def main():
     set_seed(12345)
@@ -108,6 +161,7 @@ def main():
     wind = UrbanWindField(eta_w=0.3, dtype=DTYPE, device=DEV, seed=7)
     gen = GUAMEncounters(GUAM_MAT, range(2500, 3000), seed=12345)
     prob, params, _ = build_noslack_qp(HP, DT, AMAX, DSEP)
+    mprob, mparams, mepsv = build_minslack_qp(HP, DT, AMAX, DSEP)
 
     T = 20
     n_conf = 0
@@ -115,11 +169,15 @@ def main():
     n_conf_all_feas = 0           # conflicts where eps=0 feasible at every step
     per_conf_infeas_steps = []
     per_conf_step_infeas = []   # 22x20 raster: per-conflict 0/1 per rollout step
-    for _ in range(N // 8):
+    per_conf_episode_id = []    # global episode index in 0..N-1 (row alignment)
+    per_conf_cpa_step = []      # realized closest-approach step per conflict
+    per_conf_step_slack = []    # (n_conf, T) continuous min CBF relaxation [m]
+    for _bi in range(N // 8):
         x0, nh, nf, _r, _f = gen.sample(8, T, DEV)
         # closed-loop rollout with the real (slacked) planner
         x = x0
         min_sep = torch.full((8,), 1e6, dtype=DTYPE, device=DEV)
+        cpa_step = torch.zeros(8, dtype=torch.long, device=DEV)
         traj_x = [x0.clone()]
         for t in range(T):
             p0 = x[:, 0:3]; v0 = x[:, 3:6]
@@ -133,15 +191,19 @@ def main():
             x = dyn.step(x, u, wind.sample(p0), DT)
             traj_x.append(x.clone())
             d = torch.linalg.norm(x[:, 0:3] - nf[:, 0, t + 1, :], dim=-1)
+            _upd = d < min_sep
+            cpa_step = torch.where(_upd, torch.full_like(cpa_step, t), cpa_step)
             min_sep = torch.minimum(min_sep, d)
 
         conflict = (min_sep < DSEP).cpu().numpy()
+        cpa_np = cpa_step.cpu().numpy()
         for b in range(8):
             if not conflict[b]:
                 continue
             n_conf += 1
             infeas_steps = 0
             step_row = [0] * T
+            slack_row = [float('nan')] * T
             for t in range(T):
                 xb = traj_x[t][b]
                 p0v = xb[0:3].cpu().numpy()
@@ -160,8 +222,13 @@ def main():
                 if feas is False:
                     infeas_steps += 1
                     step_row[t] = 1
+                slack_row[t] = minslack_value(mprob, mparams, mepsv,
+                                              p0v, v0v, p_refv, npred)
             per_conf_infeas_steps.append(infeas_steps)
             per_conf_step_infeas.append(step_row)
+            per_conf_step_slack.append(slack_row)
+            per_conf_episode_id.append(_bi * 8 + b)
+            per_conf_cpa_step.append(int(cpa_np[b]))
             if infeas_steps > 0:
                 n_conf_with_infeas += 1
             else:
@@ -191,6 +258,14 @@ def main():
         w('  [dumped %d per-conflict infeasible-step counts -> infeasible_steps.npy]' % arr.size)
         raster = np.array(per_conf_step_infeas, dtype=np.uint8)  # (n_conf, T)
         np.save(os.path.join(_figdd, 'infeasibility_raster.npy'), raster)
+        # ---- attribution_v2.npz: raster + row alignment keys (FIG05) ----
+        np.savez(os.path.join(_figdd, 'attribution_v2.npz'),
+                 episode_ids=np.asarray(per_conf_episode_id, dtype=np.int64),
+                 infeasible=raster.astype(bool),
+                 cpa_step=np.asarray(per_conf_cpa_step, dtype=np.int64),
+                 min_slack=np.asarray(per_conf_step_slack, dtype=np.float64))
+        w('  [dumped attribution_v2.npz: episode_ids/infeasible/cpa_step, '
+          'infeasible.sum()=%d]' % int(raster.sum()))
         w('  [dumped %dx%d per-step infeasibility raster -> infeasibility_raster.npy]' % raster.shape)
         w("  infeasible steps per conflict (mean/max) : %.2f / %d"
           % (arr.mean(), arr.max()))
