@@ -64,6 +64,10 @@ DT = 0.2
 T_EPISODE = 20        # closed-loop horizon (steps)
 EVAL_RANGE = range(2500, 3000)   # held-out trajectories (no overlap w/ training)
 WIND_SEED = 7
+# Disturbance strength is the PRODUCT eta_w * gust_std. gust_std used to be
+# left at the wind.py default, which is exactly how the manuscript came to
+# declare a nominal of 0.5 while the pipeline ran at 0.3. Pin it here.
+GUST_STD = 3.0
 WIND_ETA = 0.3
 GLOBAL_SEED = 12345
 
@@ -93,7 +97,9 @@ def make_best_planner(n_neighbors=1):
 @torch.no_grad()
 def evaluate_policy(predictor, planner, n=200, device="cuda",
                     d_sep=D_SEP, T=T_EPISODE, seed=GLOBAL_SEED,
-                    policy=None, ade_predictor=None, eta_w=WIND_ETA):
+                    policy=None, ade_predictor=None, eta_w=WIND_ETA,
+                    gust_std=GUST_STD, wind_seed=WIND_SEED,
+                    plant_params=None, act_delay=0, thrust_eff=1.0):
     """Run the closed loop on n held-out encounters and return metrics.
 
     Args
@@ -112,9 +118,12 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
     else:
         Hp = getattr(policy, "Hp", BEST_PLANNER["horizon"])
 
-    dyn = EVTOLDynamics(DEFAULT_PARAMS, dtype=DTYPE, device=device)
-    wind = UrbanWindField(eta_w=eta_w, dtype=DTYPE, device=device,
-                          seed=WIND_SEED)
+    # PLANT may be perturbed; the CONTROLLER always stays on DEFAULT_PARAMS
+    # (that asymmetry is what constitutes model mismatch).
+    dyn = EVTOLDynamics(DEFAULT_PARAMS if plant_params is None else plant_params,
+                        dtype=DTYPE, device=device)
+    wind = UrbanWindField(eta_w=eta_w, gust_std=gust_std, dtype=DTYPE,
+                          device=device, seed=wind_seed)
     gen = GUAMEncounters(GUAM_MAT, EVAL_RANGE, seed=seed)
 
     weight = DEFAULT_PARAMS.weight
@@ -153,6 +162,12 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
 
         # ---- closed-loop rollout ----
         x = x0
+        # actuator transport lag: hold a queue of past commands, initialised
+        # with a gravity-balancing hover so the lag is physical rather than a
+        # free do-nothing head start.
+        _hover = torch.zeros(batch, 4, dtype=DTYPE, device=device)
+        _hover[:, 0] = weight
+        cmd_buf = [_hover.clone() for _ in range(int(act_delay))]
         min_sep = torch.full((batch,), 1e6, dtype=DTYPE, device=device)
         energy = torch.zeros(batch, dtype=DTYPE, device=device)
         dist_hist = torch.zeros(batch, T, dtype=DTYPE, device=device)
@@ -166,8 +181,19 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
             except Exception:
                 u = torch.zeros(batch, 4, dtype=DTYPE, device=device)
                 u[:, 0] = weight
-            x = dyn.step(x, u, wind.sample(p0), DT)
+            if int(act_delay) > 0:
+                cmd_buf.append(u)
+                u_exec = cmd_buf.pop(0)
+            else:
+                u_exec = u
+            u_plant = u_exec
+            if thrust_eff != 1.0:
+                u_plant = u_exec.clone()
+                u_plant[:, 0] = u_plant[:, 0] * thrust_eff
+            x = dyn.step(x, u_plant, wind.sample(p0), DT)
 
+            # effort is scored on the COMMANDED action (what the controller
+            # asked for), not the degraded one the plant executed.
             thr_n = (u[:, 0] - weight) / weight
             mom_n = u[:, 1:4] / mmax
             energy = energy + thr_n ** 2 + (mom_n ** 2).sum(-1)
