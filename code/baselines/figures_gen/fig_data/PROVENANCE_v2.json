@@ -207,5 +207,68 @@
     ],
     "mcnemar_exact_p": 0.5,
     "note": "oracle_slack_at_cpa is the ORACLE-REPLAY QP's relaxation slack, not Stage-2's. The text's '20 of the 22' refers to this quantity."
+  },
+  "wind_eta_calibration": {
+    "status": "RESOLVED 2026-08-04 (blocking #1 from round 1, never closed until now)",
+    "finding": "The canonical pipeline runs at eta_w=0.3 with gust_std=3.0 (product 0.9). eval_common.py:116 constructs UrbanWindField(eta_w=WIND_ETA) WITHOUT passing gust_std, so it silently takes the wind.py default of 3.0. The manuscript declared a nominal of 0.5 (product 1.5). These are NOT the same disturbance: measured at seed 7 over 64 positions, gust RMS is 0.6654 vs 1.1090, max|gust| 2.0343 vs 3.3904, max abs difference 1.356 m/s, amplitude ratio exactly 0.6 = 0.3/0.5.",
+    "adjudication": "Route A: the CODE is authoritative, the manuscript declaration was an isolated typo. Every result in the paper (7-arm table, Stage-1b ADE 1.839 matching the stated 1.84, fig02, fig05) reproduces byte-for-byte at 0.3, so the numbers are self-consistent and only the Section 5.2 parameter statement was wrong. Re-running at 0.5 would invalidate two pushed commits and re-open the 81-vs-82 boundary episode in order to chase a documentation error.",
+    "manuscript_actions": [
+      "Section 5.2 nominal -> eta_w=0.3, state gust_std=3.0 explicitly",
+      "sweep grid becomes [0.3,0.5,1.0,1.5]; 'tripling' -> 'five times nominal' (0.3->1.5)",
+      "delete the 'independent resampling' explanation of the half-point offset: the offset was caused by the old sweep starting at 0.5, which is 67% stronger than canonical",
+      "r_conf for the sweep = 18.932 (v2 calibration); 18.571 was calibrated at 0.5"
+    ],
+    "root_cause": "gust_std existed only as a function default and never appeared in the manuscript, so no reviewer or author could see that eta_w alone does not determine disturbance strength. Disturbance strength is the PRODUCT eta_w * gust_std.",
+    "measured_equivalence_check": {
+      "eta0.3_gust3.0_vs_eta0.5_gust3.0_maxabsdiff": 1.3561718770117874,
+      "eta0.3_gust5.0_vs_eta0.5_gust3.0_maxabsdiff": 4.440892098500626e-16,
+      "note": "The arithmetic 0.3*5.0 == 0.5*3.0 is exact (diff 4.4e-16), but its premise is false: eval_common never sets gust_std=5.0."
+    }
+  },
+  "mismatch_wind_rows": {
+    "source": "code/plangrad_sim/eval_mismatch.py regimes table (lines 328-341)",
+    "regime_count": 9,
+    "matches_tab_mismatch_rows": true,
+    "note": "An earlier claim that MISMATCH.txt held only 8 regimes was a miscount; grep -c '^### ' returns 9. There is no orphan row.",
+    "defaults_are_canonical": {
+      "wind_eta": 0.3,
+      "wind_gust": 3.0,
+      "wind_seed": 7,
+      "comment": "eval_mismatch.py:235 DOES pass gust_std explicitly, unlike eval_common.py:116"
+    },
+    "wind_shift_row": {
+      "wind_eta": 1.0,
+      "wind_gust": 5.0,
+      "wind_seed": 99,
+      "product": 5.0,
+      "multiple_of_canonical": 5.555555555555555,
+      "ambiguity_warning": "This row and the eta=1.0 point of the wind sweep are BOTH labelled 'eta_w=1.0' but differ in two ways: gust_std 5.0 vs 3.0 (strength 5.0 vs 3.0, a 67% difference) and field seed 99 vs 7 (a different realisation). The table row label must disambiguate."
+    },
+    "combined_row_uses_same_wind": true
+  },
+  "lessons": {
+    "plausible_but_falsified_diagnoses": [
+      {
+        "claim": "The certificate arms' low bias came from OSQP being used instead of the differentiable QP.",
+        "why_it_appealed": "FastCBFMPC does exist and does use OSQP.",
+        "how_it_died": "Vanilla passes policy=, and FastCBFMPC is only constructed when policy is None."
+      },
+      {
+        "claim": "The bias was a CPU-vs-CUDA discrepancy.",
+        "why_it_appealed": "The arms were re-run on a different device.",
+        "how_it_died": "Measured float64 relative error over 20 steps is 1.1e-16, twelve orders of magnitude below the observed 1e-3."
+      },
+      {
+        "claim": "eta_w=0.3 is an alternative normalisation equivalent to the manuscript's 0.5 via gust_std=5.0.",
+        "why_it_appealed": "0.3*5.0 == 0.5*3.0 exactly, and a 'gust 5' does appear in the codebase.",
+        "how_it_died": "eval_common.py:116 never passes gust_std; the only gust_std=5.0 lives in the mismatch wind-shift regime. Measured max abs difference 1.356 m/s, ratio exactly 0.6."
+      },
+      {
+        "claim": "The 9th row of tab:mismatch had no provenance and was probably a separate ad-hoc run.",
+        "why_it_appealed": "It is the only regime that alters gust_std.",
+        "how_it_died": "It sits in the same regimes list at eval_mismatch.py:336; MISMATCH.txt contains 9 '### ' headers, not 8. The premise was a miscount."
+      }
+    ],
+    "rule": "An arithmetic coincidence is a hypothesis about the code, not evidence about it. Read the call site, then measure. Three of the four diagnoses above were arithmetically or structurally attractive and all were killed by one grep or one measurement."
   }
 }
