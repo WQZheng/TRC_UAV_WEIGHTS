@@ -1,0 +1,11 @@
+method      : PlanGrad (OURS): Stage-2 + CBF-MPC (best planner)
+eval_model  : stage2_final.pt + tuned CBF-MPC
+n / seed    : 200 / 12345
+planner     : {'alpha': 0.1, 'horizon': 15, 'a_max': 20.0}  d_sep=30.0
+eval_range  : 2500-3000 (held-out)
+------------------------------------------------
+CR (%)      : 11.00
+minSep (m)  : 47.74
+ADE (m)     : 4.32
+LeadT (s)   : 0.038
+Energy      : 52.349

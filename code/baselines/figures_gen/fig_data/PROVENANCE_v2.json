@@ -1,0 +1,120 @@
+{
+  "generated": "re-run with patched eval_common.evaluate_policy (per-episode arrays)",
+  "eval": {
+    "n": 200,
+    "seed": 12345,
+    "d_sep": 30.0,
+    "eta_w": 0.3,
+    "device": "cuda",
+    "eval_range": [
+      2500,
+      3000
+    ],
+    "planner": {
+      "alpha": 0.1,
+      "horizon": 15,
+      "a_max": 20.0
+    }
+  },
+  "invariant": "CR_% in result.json == 100*mean(minsep_per_ep < 30) in per_episode.npz",
+  "arms": {
+    "Stage2": {
+      "dir": "00_plangrad_reference",
+      "metrics": {
+        "CR_%": 11.0,
+        "minSep_m": 47.74423445544035,
+        "ADE_m": 4.321184706484628,
+        "LeadT_s": 0.03800000000000001,
+        "Energy": 52.348666713530584,
+        "n": 200
+      },
+      "k_conflicts": 22,
+      "cr_from_array": 11.0,
+      "eval_model": "stage2_final.pt + tuned CBF-MPC"
+    },
+    "Stage-1b": {
+      "dir": "07_stage1b",
+      "metrics": {
+        "CR_%": 11.5,
+        "minSep_m": 47.78527087360108,
+        "ADE_m": 1.8388262013985008,
+        "LeadT_s": 0.03700000000000002,
+        "Energy": 52.89829010187697,
+        "n": 200
+      },
+      "k_conflicts": 23,
+      "cr_from_array": 11.5,
+      "eval_model": "stage1b_domainadapt.pt + tuned CBF-MPC"
+    },
+    "Constant-Velocity": {
+      "dir": "01_constant_velocity",
+      "metrics": {
+        "CR_%": 12.0,
+        "minSep_m": 47.794953768404405,
+        "ADE_m": 0.8279240717499289,
+        "LeadT_s": 0.03700000000000002,
+        "Energy": 52.873862723664814,
+        "n": 200
+      },
+      "k_conflicts": 24,
+      "cr_from_array": 12.0,
+      "eval_model": "ConstantVelocityPredictor (no training)"
+    },
+    "Vanilla-MPC": {
+      "dir": "02_vanilla_mpc",
+      "metrics": {
+        "CR_%": 41.0,
+        "minSep_m": 29.84171437373633,
+        "ADE_m": 4.321184706484628,
+        "LeadT_s": 0.06599999999999998,
+        "Energy": 19.109322465926894,
+        "n": 200
+      },
+      "k_conflicts": 82,
+      "cr_from_array": 41.0,
+      "eval_model": "stage2_final.pt (predictor); Vanilla-MPC planner"
+    },
+    "Fixed-Predictor": {
+      "dir": "03_fixed_predictor",
+      "metrics": {
+        "CR_%": 12.5,
+        "minSep_m": 46.33509107405549,
+        "ADE_m": 20.896425985018112,
+        "LeadT_s": 0.039000000000000014,
+        "Energy": 51.46677794719345,
+        "n": 200
+      },
+      "k_conflicts": 25,
+      "cr_from_array": 12.5,
+      "eval_model": "stage1_full.pt (displacement-only, frozen)"
+    },
+    "Soft-IPP": {
+      "dir": "04_soft_ipp",
+      "metrics": {
+        "CR_%": 53.0,
+        "minSep_m": 29.063270668297815,
+        "ADE_m": 6.4485703591618275,
+        "LeadT_s": 0.07999999999999993,
+        "Energy": 16.974993813873095,
+        "n": 200
+      },
+      "k_conflicts": 106,
+      "cr_from_array": 53.0,
+      "eval_model": "soft_joint.pt (jointly trained); Vanilla-MPC planner"
+    },
+    "Conformal-MPC": {
+      "dir": "05_conformal_mpc",
+      "metrics": {
+        "CR_%": 11.5,
+        "minSep_m": 48.79959984162078,
+        "ADE_m": 20.896425985018112,
+        "LeadT_s": 0.034000000000000016,
+        "Energy": 58.134976321536485,
+        "n": 200
+      },
+      "k_conflicts": 23,
+      "cr_from_array": 11.5,
+      "eval_model": "stage1_full.pt (frozen) + conformal-inflated CBF-MPC"
+    }
+  }
+}

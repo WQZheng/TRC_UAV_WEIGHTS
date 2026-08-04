@@ -39,6 +39,7 @@ import sys
 import os
 import json
 import torch
+import numpy as np
 
 # make plangrad_sim importable no matter where this is run from
 PLANGRAD_DIR = "/data/lab/plangrad/plangrad_sim"
@@ -122,6 +123,7 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
     ade_net = ade_predictor if ade_predictor is not None else predictor
 
     n_coll = tot = 0
+    ms_all, en_all = [], []   # per-episode min_sep / effort (figure provenance)
     sep_sum = 0.0
     ade_sum = 0.0
     lead_sum = 0.0
@@ -187,6 +189,8 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
         n_coll += int((min_sep < d_sep).sum().item())
         sep_sum += float(min_sep.sum().item())
         energy_sum += float(energy.sum().item())
+        ms_all.append(min_sep.detach().cpu().numpy().copy())
+        en_all.append(energy.detach().cpu().numpy().copy())
         tot += batch
 
     return {
@@ -196,17 +200,34 @@ def evaluate_policy(predictor, planner, n=200, device="cuda",
         "LeadT_s": lead_sum / tot,
         "Energy": energy_sum / tot,
         "n": tot,
+        # Per-episode arrays so that figures and the main table are provenance-
+        # identical BY CONSTRUCTION: CR_% == 100*mean(minsep_per_ep < d_sep).
+        "minsep_per_ep": np.concatenate(ms_all),
+        "effort_per_ep": np.concatenate(en_all),
     }
 
 
 def write_result(out_dir, method_name, model_name, metrics, extra=None):
     """Persist a baseline's result as both result.txt and result.json."""
     os.makedirs(out_dir, exist_ok=True)
+    # Split per-episode arrays out of the JSON payload: they go to a sidecar
+    # .npz so result.json stays scalar-only (and JSON-serialisable), while the
+    # figures read the very same arrays the scalars were reduced from.
+    arrays = {k: v for k, v in metrics.items() if isinstance(v, np.ndarray)}
+    scalars = {k: v for k, v in metrics.items() if not isinstance(v, np.ndarray)}
+    if arrays:
+        np.savez(os.path.join(out_dir, "per_episode.npz"), **arrays)
+        ms = arrays.get("minsep_per_ep")
+        if ms is not None:
+            # Provenance self-check: the table CR must equal the figure CR.
+            cr_arr = 100.0 * float((ms < D_SEP).sum()) / len(ms)
+            assert abs(cr_arr - scalars["CR_%"]) < 1e-9, (
+                f"CR mismatch: scalar {scalars['CR_%']} vs array {cr_arr}")
     payload = {"method": method_name, "eval_model": model_name,
-               "n": metrics["n"], "seed": GLOBAL_SEED,
+               "n": scalars["n"], "seed": GLOBAL_SEED,
                "planner": BEST_PLANNER, "d_sep": D_SEP,
                "eval_range": [EVAL_RANGE.start, EVAL_RANGE.stop],
-               "metrics": metrics}
+               "metrics": scalars}
     if extra:
         payload.update(extra)
     with open(os.path.join(out_dir, "result.json"), "w") as f:
@@ -214,13 +235,13 @@ def write_result(out_dir, method_name, model_name, metrics, extra=None):
     with open(os.path.join(out_dir, "result.txt"), "w") as f:
         f.write(f"method      : {method_name}\n")
         f.write(f"eval_model  : {model_name}\n")
-        f.write(f"n / seed    : {metrics['n']} / {GLOBAL_SEED}\n")
+        f.write(f"n / seed    : {scalars['n']} / {GLOBAL_SEED}\n")
         f.write(f"planner     : {BEST_PLANNER}  d_sep={D_SEP}\n")
         f.write(f"eval_range  : {EVAL_RANGE.start}-{EVAL_RANGE.stop} (held-out)\n")
         f.write("-" * 48 + "\n")
-        f.write(f"CR (%)      : {metrics['CR_%']:.2f}\n")
-        f.write(f"minSep (m)  : {metrics['minSep_m']:.2f}\n")
-        f.write(f"ADE (m)     : {metrics['ADE_m']:.2f}\n")
-        f.write(f"LeadT (s)   : {metrics['LeadT_s']:.3f}\n")
-        f.write(f"Energy      : {metrics['Energy']:.3f}\n")
+        f.write(f"CR (%)      : {scalars['CR_%']:.2f}\n")
+        f.write(f"minSep (m)  : {scalars['minSep_m']:.2f}\n")
+        f.write(f"ADE (m)     : {scalars['ADE_m']:.2f}\n")
+        f.write(f"LeadT (s)   : {scalars['LeadT_s']:.3f}\n")
+        f.write(f"Energy      : {scalars['Energy']:.3f}\n")
     print(f"[saved] {out_dir}/result.txt + result.json")

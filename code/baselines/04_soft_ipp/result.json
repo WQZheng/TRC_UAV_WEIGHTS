@@ -1,0 +1,25 @@
+{
+  "method": "Soft-IPP (joint training, soft planner, no CBF)",
+  "eval_model": "soft_joint.pt (jointly trained); Vanilla-MPC planner",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 53.0,
+    "minSep_m": 29.063270668297815,
+    "ADE_m": 6.4485703591618275,
+    "LeadT_s": 0.07999999999999993,
+    "Energy": 16.974993813873095,
+    "n": 200
+  },
+  "w_rep": 50.0
+}

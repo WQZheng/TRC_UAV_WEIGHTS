@@ -1,0 +1,24 @@
+{
+  "method": "Stage-1b: domain-adapted predictor + CBF-MPC (best planner)",
+  "eval_model": "stage1b_domainadapt.pt + tuned CBF-MPC",
+  "n": 200,
+  "seed": 12345,
+  "planner": {
+    "alpha": 0.1,
+    "horizon": 15,
+    "a_max": 20.0
+  },
+  "d_sep": 30.0,
+  "eval_range": [
+    2500,
+    3000
+  ],
+  "metrics": {
+    "CR_%": 11.5,
+    "minSep_m": 47.78527087360108,
+    "ADE_m": 1.8388262013985008,
+    "LeadT_s": 0.03700000000000002,
+    "Energy": 52.89829010187697,
+    "n": 200
+  }
+}
