@@ -51,6 +51,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse
+import os
 import numpy as np
 import torch
 
@@ -238,9 +239,19 @@ def main():
       % (ALPHA, HP, AMAX, D_SEP, args.n, args.seed))
     w("CPA placed at t_cpa = horizon/dt steps; geometry otherwise fixed.")
     w("Conflict = min separation < %.0f m. Oracle = true neighbour future." % D_SEP)
+    # The two predictor positions are FILLED BY THE CALLER, so a fixed header of
+    # "S1"/"S2" misreports which arm a column holds. Past sweeps passed
+    # stage1b_domainadapt.pt into --stage2 and the resulting file claimed to be
+    # Stage-2, which cost a later reader an audit to untangle. Echo the actual
+    # weight files, and label the columns by them.
+    w("--stage1 = %s" % os.path.basename(args.stage1))
+    w("--stage2 = %s" % os.path.basename(args.stage2))
     w("=" * 78)
+    c1 = os.path.splitext(os.path.basename(args.stage1))[0][:8]
+    c2 = os.path.splitext(os.path.basename(args.stage2))[0][:8]
     w("%6s | %8s %8s %8s | %s" %
-      ("horiz", "S1 CR%", "S2 CR%", "Oracle%", "attribution of S2 conflicts"))
+      ("horiz", c1 + " CR%", c2 + " CR%", "Oracle%",
+       "attribution of --stage2 conflicts"))
 
     for h_s in horizons_s:
         t_cpa = int(round(h_s / DT))

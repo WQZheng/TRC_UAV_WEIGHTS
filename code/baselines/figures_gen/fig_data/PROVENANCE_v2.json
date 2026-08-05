@@ -295,7 +295,9 @@
     "rule_4": "A data file is not provenance. Before plotting an archived array, verify it reduces to an already-published number by an explicit weighted identity, and confirm its abscissa is defined somewhere. errdir_profile.npz passed every superficial test - right directory, right arm names, right shape, a script that called it authoritative - and was still computed with a different CPA anchor, a different frame, a one-step time offset and a different episode horizon.",
     "rule_5": "The log-ordinate veto is conditioned on zero-reference semantics, not on dynamic range. It was issued for Fig. 5, whose entire claim rests on a zero line (the rescue threshold) that a log axis cannot represent. An error profile carries no such reference, so the veto does not reach it. Fig. 8 still avoids a log ordinate for an independent reason: its comparison of record is multiplicative (1.04 against 4.07 m critical error), and a log axis renders a factor of four as a constant visual offset, hiding the very gap the figure exists to show. Two stacked linear panels at their own full ranges were used instead. Cite this rather than re-litigating when cross-range data recurs.",
     "rule_6": "Verify overlay placement geometrically, not by pixel colour. A colour-counting check on Fig. 8 reported all three arms as colliding with the legends when none did: the curves span the full panel width, so colour cannot distinguish 'curve beneath the legend' from 'curve elsewhere in the same pixel rows'. The reliable test compares each overlay's window extent against the curves' display-coordinate vertices AND the densely sampled segments between them, which names the offending segment instead of returning a pixel count. It caught two real collisions the pixel method had buried in false positives. Note also that an inset's tight bounding box extends about 0.056 of the host panel's height below its axes frame once a y-label and tick text are present, so a gap sized against the axes frame alone is not enough.",
-    "rule_7": "Assert that no axis clips its data. Two separate defects in this figure set were invisible without it: Fig. 9's difference panel silently dropped six of 200 points that lay outside a range chosen for the arm panel, and the left margin clipped nothing but antialiasing. Range choices made for one panel do not transfer to a panel showing a derived quantity, so check each axis against min and max of what it actually draws, and check the canvas edges for ink after rendering."
+    "rule_7": "Assert that no axis clips its data. Two separate defects in this figure set were invisible without it: Fig. 9's difference panel silently dropped six of 200 points that lay outside a range chosen for the arm panel, and the left margin clipped nothing but antialiasing. Range choices made for one panel do not transfer to a panel showing a derived quantity, so check each axis against min and max of what it actually draws, and check the canvas edges for ink after rendering.",
+    "rule_8": "Style is registry-resolved, never literal. A figure asks for an entity by name and writes no hex. Same entity, same colour, across every figure: cross-figure identity outranks any within-figure aesthetic, because a reader tracking one arm between figures is misled by a colour change in a way no local improvement repays. A colour already spent on another entity is not free, and 'they never share a figure' is the ONLY admissible reason to reuse one -- it must be recorded when invoked. Verify against the rendered canvas, not the source: assert the retired colour's ink count is 0.",
+    "rule_9": "Place overlays by measurement in the coordinate system the API actually consumes. bbox_to_anchor takes axes fractions; reasoning in data units put a legend at 'fraction 0.335' meaning 29% conflict rate, straight through a descending curve, for 1904 collisions. Convert explicitly, and check overlays against each other as well as against the data, since two overlays can each clear the curves and still collide. Remember an annotation's extent includes its arrow and an inset's tightbbox extends about 0.056 panel heights below its frame."
   },
   "wind_sweep_v2": {
     "grid_eta_w": [
@@ -467,5 +469,109 @@
     "outlier_rendering": "Panel (a) focuses on [-2.2,+2.2] m and marks encounter 93 at the axis edge with arrows and its numeric values, rather than clipping it silently or letting it compress the other 199 encounters into a line. This is annotation off-scale, not a broken axis: nothing is hidden and the encounter's paired difference is drawn normally in panel (b), circled and labelled. Panel (b) spans [-2.6,+2.6] because its data reach -2.289 and +2.399 m and no outlier justifies clipping there; the two panels therefore carry different ordinate ranges, which the caption states. A self-check refuses to plot if either panel would clip a point.",
     "leave_one_out": "Dropping encounter 93 moves the paired mean from -0.1639 to -0.1712 m and the paired-t p from 0.00740 to 0.00507, so the contrast is robust to it. The ARM-level dispersion is not: Stage-1b goes from -0.176 +/- 0.239 to +0.062 +/- 0.025 (the sign of the mean flips and the SEM falls by a factor of 9.5) and Stage-2 from -0.340 +/- 0.235 to -0.109 +/- 0.047. tab:errdir's SEMs and its '|mean| > 2 SEM ? NO' verdict are therefore driven by this single encounter. The n=200 figures remain the reported ones, but a leave-one-out footnote states this so a referee's sensitivity analysis finds nothing unannounced.",
     "geometry_inset": "A small inset in panel (a) fixes the sign convention with five elements only: ego, true neighbour, predicted neighbour, the line-of-sight axis, and the projection labelled e_parallel < 0. It is an extension of the axis label rather than a concept schematic, which is why it is an inset and not a panel. Placed in the empty upper band: measured occupancy shows no point and no connecting line reaches [+1.8,+2.2] m, and the Stage-1b column is empty above +0.959 m."
+  },
+  "fig10_leadtime": {
+    "figure": "figures_v1/fig10_leadtime.pdf",
+    "script": "figure_plotting_v1/fig10_leadtime.py",
+    "data": "fig_data/leadtime_v2.npz",
+    "panels": {
+      "a": "conflict rate versus available detection lead time, four arms, full 0-90% range, log abscissa to seat the uneven 1/2/3/4/5/6/7/10/20 s grid. Three regime bands in neutral grey. Hosts the mechanism inset.",
+      "b": "same series magnified to 0-17%, resolving the Stage-1 hump against the Stage-1b matched control and the exact zeros of Stage 2 and the oracle. Hosts the shared legend."
+    },
+    "stage1_hump": {
+      "values_3_to_7s": [
+        1.5,
+        7.000000000000001,
+        10.0,
+        12.0,
+        8.5
+      ],
+      "note": "1.5 -> 7.0 -> 10.0 -> 12.0 -> 8.5, non-monotone, matches the manuscript verbatim. Hedged in the caption as 'consistent with predictor-induced spurious avoidance'. The stronger reading, that the predictor induces conflicts, is not claimed: the data show a rate, not a cause."
+    },
+    "matched_control": {
+      "stage1b_max_from_3s": 0.5,
+      "note": "Stage-1b stays at or below 0.5% from 3 s onward, so the hump is specific to Stage 1 and not a property of any arm that shares its training regime. This control is load-bearing and now rests on a column locked by weight filename, not on column position."
+    },
+    "zero_cells": {
+      "count": 14,
+      "note": "14 of the 36 cells are exactly 0.0. This is why the ordinate is linear: rule_5 restricts a log ordinate to the case where a zero reference carries the meaning (fig05's rescue line). Here zero IS the result, and a log axis cannot draw it."
+    },
+    "attribution_inset": {
+      "content": "mechanism split of the lead-time conflicts themselves, actuation-limited versus prediction-limited. NOT the weak-constraint result, which is a separate figure.",
+      "1s": {
+        "n": 165,
+        "pct_actuation": 97.6
+      },
+      "2s": {
+        "n": 22,
+        "pct_actuation": 95.5
+      },
+      "note": "both rows carry their n because 98% of 165 and 95% of 22 are not equally trustworthy. No bar is drawn from 3 s on: with zero conflicts the split is undefined, and an empty slot would read as a measured zero."
+    },
+    "axis_ranges": {
+      "panel_a": [
+        -3.0,
+        92.0
+      ],
+      "panel_b": [
+        -0.6,
+        17.0
+      ],
+      "note": "panel (b) is raised to 17 although its data top out at 13.0. The two notes needed room: the only curve-free block at a ceiling of 14 measured 159 px against a 233 px note, so no placement stayed on the canvas. Widening a limit cannot hide data, which is the direction rule_7 permits; the ranges of (a) and (b) differ and the caption says so."
+    },
+    "verification": [
+      "occlusion: four overlays (legend, inset, two notes) versus densely sampled curve vertices in display coordinates, 0 hits each",
+      "overlay-versus-overlay: bbox intersection over all pairs, none. Added after hand placement put the legend under the inset twice; the data-only test could report this just as an inflated hit count",
+      "clipping: every text artist inside the canvas, by extent, naming the artist. Found a clipped regime label and note that the edge-pixel probe could only quantify as 105 dark pixels",
+      "edge ink: 0 on all four borders of the raster",
+      "escapes: no LaTeX escape in any drawn label",
+      "colour: every drawn colour registered in figstyle"
+    ],
+    "falsified_during_construction": [
+      "the drafted colours were wrong twice over: Stage-1 was given #D55E00, which belongs to Vanilla-MPC, and the oracle was given #7A7A7A, which in this figure family is Stage-1's own grey. A proposal to hand the oracle #CC79A7 was also wrong, since that is Soft-IPP's. Resolved by reusing #8E44AD, the colour the oracle replay already carries in fig05 panel (c)",
+      "the regime bands were tinted with #D55E00 and #0072B2, spending Vanilla-MPC's colour a second time and implying the last band belongs to Stage 2. A band marks an interval of the abscissa, a property of the experiment and of no arm, so it is now neutral grey",
+      "the labels really did render as literal '\\%' and '\\,s': usetex is off and the escapes were only visible by extracting the PDF text layer, not by looking at the image"
+    ]
+  },
+  "style_registry": {
+    "file": "figure_plotting_v1/figstyle.py",
+    "purpose": "single source for colour, typography and the geometric checks. Created after style drift occurred four times: the serif family diverged three times and fig10 was drafted with another arm's colour. Root cause was identical each time, every script hard-coding its own literals.",
+    "authority": "RETROSPECTIVE. The nine locked figures are ground truth; each registry value was read out of their sources. Locked figures are NOT re-rendered to match it. fig10 onward imports it; fig01-fig09 are left alone.",
+    "not_to_be_confused_with": {
+      "file": "figure_plot/figstyle.py",
+      "note": "a different module for an older, differently-numbered series (fig11_leadtime, fig13_corridor, ...) imported by twelve scripts. It contradicts the locked series on five entities: Soft-IPP yellow not #CC79A7, Conformal-MPC #CC79A7 not #56B4E9, Stage-1 #56B4E9, Constant-Velocity #E69F00, oracle black not #8E44AD. Left untouched because editing it would break those twelve scripts."
+    },
+    "entities": {
+      "Stage-2": "#0072B2",
+      "Stage-1b": "#009E73",
+      "Oracle": "#8E44AD",
+      "Conformal-MPC": "#56B4E9",
+      "Vanilla-MPC": "#D55E00",
+      "Soft-IPP": "#CC79A7",
+      "Fixed-Predictor": "#E69F00",
+      "Constant-Velocity": "#7A7A7A",
+      "zero_reference": "#8A8A8A",
+      "Stage-1": "family-dependent, see recorded_inconsistency"
+    },
+    "recorded_inconsistency": {
+      "status": "RECORDED, DELIBERATELY NOT REOPENED",
+      "grey": "#7A7A7A means Constant-Velocity in the arm-comparison figures (fig01/02/03/06) and Stage 1 in the prediction-space figures (fig08/09/10).",
+      "orange": "#E69F00 means Fixed-Predictor in most figures and Stage-1 in fig06.",
+      "why_tolerated": "the two families never share a figure, so no reader sees a contradiction. Both were settled when those figures were locked; reopening either means redrawing three approved figures.",
+      "mitigation": "figstyle.color() takes a family argument for Stage-1 and refuses to answer without one, so the split cannot be resolved by accident.",
+      "related": "#CC79A7 went to Soft-IPP and #8E44AD to the oracle for the same reason: those two never share a figure either."
+    },
+    "provides": [
+      "COLORS",
+      "color(entity, family)",
+      "set_rc",
+      "wilson_ci",
+      "curve_samples",
+      "check_overlays",
+      "check_clipping",
+      "check_escapes",
+      "edge_ink",
+      "assert_registered"
+    ]
   }
 }
