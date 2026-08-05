@@ -200,6 +200,61 @@ def check_clipping(fig, axes, renderer):
     print("clipping check: every text artist is inside the canvas")
 
 
+def check_cell_labels(ax, values, renderer, extra_artists=()):
+    """Assert each cell label of a heatmap sits inside its own cell, and that no
+    label collides with any other in-cell artist.
+
+    A value attributed to the wrong configuration is the most damaging error a
+    heatmap can carry and the hardest for a reader to notice -- nothing about a
+    misplaced number looks wrong. Neither the overlay test nor the clipping test
+    covers it: cell labels are neither overlays nor curves.
+
+    `values` is the (ny, nx) array, indexed so that value[i, j] is drawn centred
+    in the cell spanning x in [j, j+1] and y in [i, i+1] in data coordinates.
+    `extra_artists` are other things drawn inside cells -- reference markers, for
+    instance -- which must not sit on top of a number. Checking placement alone
+    is not enough: a marker at a cell's centre lands exactly on its label.
+
+    Returns the number of labels verified.
+    """
+    import numpy as np
+    values = np.asarray(values, float)
+    ny, nx = values.shape
+    msgs = []
+    boxes = {}
+    for i in range(ny):
+        for j in range(nx):
+            want = ax.transData.transform([[j, i], [j + 1, i + 1]])
+            target = f"{values[i, j]:.1f}"
+            for t in ax.texts:
+                if t.get_text() != target:
+                    continue
+                bb = t.get_window_extent(renderer)
+                cx, cy = (bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2
+                if not (want[0, 0] <= cx <= want[1, 0]
+                        and want[0, 1] <= cy <= want[1, 1]):
+                    continue                      # a like-valued label elsewhere
+                if (bb.x0 < want[0, 0] or bb.x1 > want[1, 0]
+                        or bb.y0 < want[0, 1] or bb.y1 > want[1, 1]):
+                    msgs.append(f"cell ({i},{j}) label {target} overflows "
+                                f"its cell")
+                boxes[(i, j)] = bb
+    if len(boxes) != ny * nx:
+        missing = [(i, j) for i in range(ny) for j in range(nx)
+                   if (i, j) not in boxes]
+        msgs.append(f"no label found inside cells {missing}")
+    for name, bb2 in extra_artists:
+        for (i, j), bb1 in boxes.items():
+            if (bb1.x0 < bb2.x1 and bb2.x0 < bb1.x1
+                    and bb1.y0 < bb2.y1 and bb2.y0 < bb1.y1):
+                msgs.append(f"{name} overlaps the label of cell ({i},{j})")
+    if msgs:
+        raise AssertionError("cell-label check failed:\n  " + "\n  ".join(msgs))
+    print(f"cell-label check: all {ny * nx} values inside their own cell, "
+          f"no collision with {len(extra_artists)} in-cell artist(s)")
+    return len(boxes)
+
+
 def check_escapes(axes, legends=()):
     """Assert no LaTeX escape reaches a drawn label. usetex is off, so '\\%' and
     '\\,' render as literal backslashes; fig10 shipped 'conflict rate (\\%)' onto
