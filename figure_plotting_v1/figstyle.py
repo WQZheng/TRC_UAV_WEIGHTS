@@ -302,3 +302,122 @@ def assert_registered(*hexes):
         raise AssertionError(
             f"unregistered colours: {unknown}. Add them to figstyle.COLORS "
             f"with provenance, or use a registered entity.")
+
+
+def check_matrix_cells(ax, nx, ny, renderer, per_cell=2):
+    """Assert every cell of an nx-by-ny transition matrix holds exactly
+    `per_cell` labels, none overflowing its cell.
+
+    Sibling of check_cell_labels, guarding the same frontier from the other
+    side. In a heatmap the risk is a value drifting into a neighbouring cell; in
+    a transition matrix it is a count drifting, which silently re-attributes a
+    transition -- "55 resolved" landing one cell over would claim Stage 2
+    introduced them. Neither the overlay test nor the clipping test covers it,
+    for the same reason as before: cell labels are neither overlays nor curves.
+
+    Unlike check_cell_labels this does not match on label text, because a
+    transition matrix's cells carry a count plus a free-text caption rather than
+    one formatted number. Cells are addressed geometrically instead: every text
+    artist whose centre falls in a cell must lie wholly within it, and the count
+    per cell must be exactly `per_cell`.
+    """
+    import numpy as np
+    msgs = []
+    for j in range(nx):
+        for i in range(ny):
+            want = ax.transData.transform([[j, i], [j + 1, i + 1]])
+            inside = []
+            for t in ax.texts:
+                if not t.get_text():
+                    continue
+                bb = t.get_window_extent(renderer)
+                cx, cy = (bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2
+                if (want[0, 0] <= cx <= want[1, 0]
+                        and want[0, 1] <= cy <= want[1, 1]):
+                    inside.append((t, bb))
+            if len(inside) != per_cell:
+                msgs.append(f"cell ({i},{j}) holds {len(inside)} labels, "
+                            f"expected {per_cell}")
+            for t, bb in inside:
+                if (bb.x0 < want[0, 0] or bb.x1 > want[1, 0]
+                        or bb.y0 < want[0, 1] or bb.y1 > want[1, 1]):
+                    msgs.append(f"label {t.get_text()[:20]!r} overflows "
+                                f"cell ({i},{j})")
+    if msgs:
+        raise AssertionError("matrix-cell check failed:\n  " + "\n  ".join(msgs))
+    print(f"matrix-cell check: all {nx * ny} cells hold exactly {per_cell} "
+          f"labels, none overflowing")
+
+
+def pdf_text_tokens(pdf_path):
+    """Every visible string in a PDF, in drawing order, one entry per text
+    object. For the semantic pass that no geometric check can perform.
+
+    PDF string literals written by the matplotlib PDF backend are UTF-16BE. An
+    earlier ad-hoc extractor sliced them one byte at a time, which turns
+    U+207B SUPERSCRIPT MINUS (bytes 20 7B) into a space followed by '{'. It
+    reported fig12's 'p = 5.6x10^-17' as garbled and the figure was briefly
+    suspected of a missing glyph; the figure was correct and the reader was not.
+    The same broken extractor had already been used on fig11, where it happened
+    to agree with the truth only because that figure contains no superscript.
+    A right conclusion drawn with a wrong tool is the more dangerous failure,
+    because nothing prompts you to retire the tool. Hence this function.
+
+    Returns a list of decoded strings. Escaped parentheses and backslashes are
+    unescaped before decoding; an odd trailing byte is padded rather than
+    dropped so a truncation shows up as a replacement character instead of
+    silently shortening the string.
+
+    This is a semantic AID, not a semantic check. It surfaces what a reader will
+    see -- adjacent labels that run together into an unintended phrase, a
+    quantity attributed to the wrong axis, a hedge that lost its qualifier --
+    but judging those remains a human task. Three figures have now shipped a
+    defect of exactly this kind past a fully green geometric suite.
+    """
+    import re
+    import zlib
+    raw = open(pdf_path, "rb").read()
+    chunks = []
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", raw, re.S):
+        try:
+            chunks.append(zlib.decompress(m.group(1)))
+        except Exception:
+            continue
+    body = b"\n".join(chunks).decode("latin-1")
+
+    def decode(block):
+        segs = []
+        for m in re.finditer(r"\[(.*?)\]\s*TJ|\((.*?)(?<!\\)\)\s*Tj", block, re.S):
+            grp = m.group(1) if m.group(1) is not None else m.group(2)
+            lits = (re.findall(r"\((.*?)(?<!\\)\)", grp, re.S)
+                    if m.group(1) is not None else [grp])
+            for lit in lits:
+                b = lit.encode("latin-1")
+                b = (b.replace(b"\\(", b"(").replace(b"\\)", b")")
+                      .replace(b"\\\\", b"\\"))
+                if len(b) % 2:
+                    b += b"\x00"
+                segs.append(b.decode("utf-16-be", errors="replace"))
+        return "".join(segs)
+
+    out = []
+    for block in re.findall(r"BT(.*?)ET", body, re.S):
+        s = decode(block)
+        if s.strip():
+            out.append(s)
+    return out
+
+
+def report_pdf_text(pdf_path):
+    """Print every visible string for the human semantic pass, and assert no
+    replacement character survived decoding."""
+    toks = pdf_text_tokens(pdf_path)
+    bad = [t for t in toks if "\ufffd" in t]
+    if bad:
+        raise AssertionError(
+            "PDF text decode produced replacement characters, so the text "
+            "layer cannot be audited:\n  " + "\n  ".join(repr(b) for b in bad))
+    print(f"pdf text layer: {len(toks)} visible strings, decoded clean")
+    for i, s in enumerate(toks):
+        print(f"  {i:3d}  {s!r}")
+    return toks
