@@ -29,8 +29,13 @@ PROVENANCE
                per-episode conflict booleans, deployment config
                alpha=0.1 Hp=15 a_max=20 d_sep=30, n=200 seed 12345.
                Published table: P2_MCNEMAR_DEV.txt.
-               conflict_vectors_q2.npz carries identical vectors but is the
-               superseded pipeline; v2 is the only admissible source here.
+               conflict_vectors_q2.npz under Round1/05_results/robustness/
+               p0_referee is byte-identical to this file (md5 8d43503cc757),
+               so it is a second copy of the same content, NOT an earlier
+               pipeline. An earlier draft of this header called it superseded;
+               that was wrong and is corrected here. The distinction matters
+               because "superseded" would imply a reader must avoid q2, whereas
+               either path yields the same vectors.
 
   alpha (code) == gamma (manuscript). Same quantity, different name; the
   manuscript reserves alpha for the predictor mixing weight alpha_{i,m}.

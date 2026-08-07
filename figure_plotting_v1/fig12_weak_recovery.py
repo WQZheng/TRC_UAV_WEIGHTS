@@ -338,13 +338,20 @@ def main():
 
     # Free cross-validation of the strong side's lineage: its discordant pair
     # (b=2, c=1) is the same nominal pair frozen into the attribution and
-    # forest figures. Agreement here means this figure really is reading the
-    # v2 pipeline and not the superseded q2 vectors, which carry identical
-    # values and would therefore pass every other check silently.
+    # forest figures. What this pins is that the file being read carries the
+    # deployment-config vectors at all, so a wrong-file substitution cannot pass
+    # silently.
+    #
+    # It does NOT distinguish v2 from conflict_vectors_q2.npz: those two are
+    # byte-identical (md5 8d43503cc757), a second copy of the same content
+    # rather than an earlier pipeline. An earlier version of this comment
+    # claimed q2 was superseded, which was wrong. The assertion keeps its value
+    # under the corrected reading -- it still catches reading the WEAK vectors,
+    # or any other file, in place of the deployment ones.
     assert (int(d["table_strong"][1]), int(d["table_strong"][2])) == (2, 1)
     print("lineage check: strong-side discordant pair (2,1) matches the "
           "nominal pair frozen in the attribution and forest figures, "
-          "confirming the v2 conflict vectors")
+          "confirming these are the deployment-config conflict vectors")
 
     used = [C_S1, C_S1B, C_S2]
     fs.assert_registered(*used)
