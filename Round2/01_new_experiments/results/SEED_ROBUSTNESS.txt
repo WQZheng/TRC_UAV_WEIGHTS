@@ -1,0 +1,47 @@
+STAGE-2 TRAINING-STOCHASTICITY ROBUSTNESS (deploy config)
+  gamma=0.1 Hp=15 a_max=20 d_sep=30, n=200 held-out 2500-2999,
+  eval seed=12345, eta_w=0.3, gust_std=3.0. gamma is the manuscript's
+  name for the code's alpha (CBFMPCLayer(alpha=...)).
+  CR is per-episode: an episode counts as a conflict if min separation
+  fell below 30 m at any tick. Effort = mean normalised control energy.
+==============================================================================
+
+  stage2_final   CR=11.00%  (22/200)  ADE= 4.321 m  MinSep= 47.74 m  Effort= 52.349
+  Stage-1b       CR=11.50%  (23/200)  ADE= 1.839 m  MinSep= 47.79 m  Effort= 52.898
+
+  control reproduces the published deploy-config values exactly: Stage-2 11.0% (22/200), Stage-1b 11.5% (23/200)
+
+PER-SEED RESULTS
+  seed      CR %  conflicts    ADE m  MinSep m    Effort
+  seed1    12.00         24    7.930     47.92    56.941
+  seed2    11.00         22    5.774     47.36    53.839
+  seed3    11.50         23    7.159     48.29    58.211
+
+SPREAD ACROSS THE THREE TRAINING SEEDS (n=3, ddof=1)
+  CR %       mean  11.500   SD  0.500   SEM  0.289   min 11.000  max 12.000
+  ADE m      mean   6.955   SD  1.092   SEM  0.631   min 5.774  max 7.930
+  MinSep m   mean  47.854   SD  0.466   SEM  0.269   min 47.359  max 48.286
+  Effort     mean  56.330   SD  2.249   SEM  1.298   min 53.839  max 58.211
+
+WHICH CONVENTION DID RUNBOOK.md:336 USE?
+  CR   reported 11.4 +/- 0.4; measured mean 11.500, SD 0.500, SEM 0.289 -> the reported spread is the SD (|diff| SD 0.100 vs SEM 0.111)
+  ADE  reported 6.3 +/- 1.4; measured mean 6.955, SD 1.092, SEM 0.631 -> the reported spread is the SD (|diff| SD 0.308 vs SEM 0.769)
+
+EXACT McNEMAR, each Stage-2 seed vs the fixed Stage-1b comparator
+  paired per episode on the same 200 encounters; exact two-sided
+  binomial on discordant pairs (the counts are single digits, so the
+  chi-square approximation is not used)
+  seed    both  S1b only  seed only  neither   b   c  net pp        p
+  seed1     23         0          1      176   0   1    +0.5   1.0000
+  seed2     21         2          1      176   2   1    -0.5   1.0000
+  seed3     22         1          1      176   1   1    +0.0   1.0000
+
+  Every comparison here is against the SAME Stage-1b vector, so the
+  three tests are not independent of one another; they answer 'is this
+  seed distinguishable from the matched control', not 'do the seeds
+  differ among themselves'.
+
+  smallest p across the three seeds: 1.0000  -> no seed is distinguishable from the matched control at 0.05
+
+wrote /data/lab/TRC_UAV_WEIGHTS/code/baselines/figures_gen/fig_data/seed_robustness_v2.npz
+  per-seed 200-dim conflict vectors: conflict__seed1, conflict__seed2, conflict__seed3, conflict__stage2_final, conflict__Stage-1b

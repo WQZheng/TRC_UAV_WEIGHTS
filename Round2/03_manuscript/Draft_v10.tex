@@ -1,0 +1,3416 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+% \usepackage[round]{natbib}
+\usepackage[authoryear,round]{natbib}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{algpseudocode}
+\usepackage{algorithmicx}
+\usepackage{algorithm}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+% ---- theorem environments ----
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+\newtheorem{hypothesis}{Hypothesis}
+
+% ---- convenient macros ----
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\thetab}{\bm{\theta}}
+\newcommand{\wb}{\bm{w}}
+\newcommand{\xb}{\bm{x}}
+\newcommand{\fphys}{f_{\mathrm{phys}}}
+\newcommand{\gnn}{g_{\mathrm{NN}}}
+\newcommand{\Identif}{\mathcal{I}}
+\newcommand{\Out}{\mathcal{Y}}
+\newcommand{\Uclass}{\mathcal{U}}
+\newcommand{\Feff}{\mathcal{F}_{\mathrm{eff}}}
+\newcommand{\Gres}{\bm{G}}
+\DeclareMathOperator{\col}{col}
+\DeclareMathOperator{\spn}{span}
+\DeclareMathOperator{\rank}{rank}
+\newcommand{\todo}[1]{\textcolor{red}{[#1]}}
+
+\newcommand{\method}{PlanGrad}
+\newcommand{\bx}{\bm{x}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\bw}{\bm{w}}
+
+\begin{document}
+
+\title{\bf Does prediction accuracy buy separation?\\
+	A closed-loop audit of prediction, planning, and manoeuvring
+	authority in low-altitude corridors}
+
+\author{}
+\date{}
+
+\maketitle
+
+\begin{abstract}
+	Trajectory predictors for low-altitude traffic are selected by
+	open-loop displacement error, and coupling them to the planner
+	during training is expected to improve safety further. Neither
+	premise has been tested where separation is enforced as an explicit
+	constraint. We develop \method, a differentiable closed-loop testbed
+	that composes multi-agent prediction, control-barrier-constrained
+	planning, and six-degree-of-freedom eVTOL dynamics, so that a single
+	component can be exchanged while the encounter is replayed. Across
+	$200$ paired conflict encounters, a twenty-five-fold spread in
+	average displacement error ($0.83$--$20.90$\,m) yields conflict
+	rates within $1.5$ percentage points ($11.0$--$12.5\%$), and
+	displacement ranking does not carry over to closed-loop separation.
+	Routing gradients through the planner produces a small, locally
+	conservative shift in prediction error near closest approach
+	($-0.164$\,m) with no detectable operational increment. Residual
+	conflicts are not resolved by replacing the forecast with the true
+	future trajectory; they instead track manoeuvring authority and
+	available response time, disappearing once detection lead time
+	reaches $3$\,s, invariantly across planning horizons of
+	$1.6$--$5.0$\,s. Cross-evaluating predictors under a second planner
+	shows that differences compressed to $2.5$ points under deployment
+	widen to $42$ points elsewhere. Corridor simulations with mixed
+	avoidance logics reduce delay, including for unequipped aircraft,
+	while corridor-retention costs grow. Operational value is a property
+	of the composed system, not of the predictor alone.
+\end{abstract}
+
+\noindent\textbf{Keywords:} urban air mobility; trajectory prediction;
+control barrier functions; conflict detection and resolution;
+decision-focused learning; mixed autonomy
+
+\section{Introduction}
+
+Low-altitude mobility is becoming a new layer of the urban
+transportation network. Electric vertical take-off and landing vehicles,
+cargo drones, and inspection unmanned aerial vehicles are adding
+passenger, logistics, and service flights to already complex urban
+systems. These operations bring new demand patterns, infrastructure
+needs, capacity constraints, and operating rules~\citep{coppola2024uam,wang2023uam,pak2024uam}. The central challenge is no longer only whether an individual aircraft can fly autonomously. It is whether many aircraft can share limited urban airspace while maintaining separation and providing reliable service. In transportation systems, safety is typically shaped jointly by vehicle capabilities, infrastructure, operating rules, and automated behavior, rather than determined by any single component. For low-altitude traffic, however, the relative contribution of these layers is not yet established, and the answer matters. It determines where research effort, evaluation
+practice, and eventually admission and airspace standards should
+concentrate.
+
+These factors interact most directly in the tactical management of
+conflicts inside designated low-altitude corridors. Corridors create
+shared operating regions in which aircraft traveling between vertiports
+and other service nodes must resolve crossing and merging encounters
+within constrained three-dimensional
+space~\citep{tang2023strategic,wang2023quasidynamic}. The outcome of
+such an encounter depends on several layers simultaneously. Onboard
+autonomy must predict the surrounding aircraft and select an avoidance
+maneuver, the vehicle must have sufficient maneuvering capability to
+execute it, and airspace and surveillance design determine how much time
+remains for the response. These encounters are further complicated by wind disturbances and imperfect observation of the surrounding traffic~\citep{nithya2024wind}. In an active corridor, stopping or hovering cannot be treated as a general recovery option. Many conflicts must therefore be resolved while both aircraft remain in motion, and the available response window is often measured in seconds rather than minutes~\citep{kuchar2000review,chen2024integrated}. Across repeated corridor operations, these vehicle-level decisions shape corridor-level loss-of-separation risk, delay, and usable capacity.
+
+Across much of the current low-altitude autonomy literature, these
+vehicle-level decisions are produced by a common modular structure.
+A predictor estimates the future motion of surrounding aircraft, and
+a planner uses those estimates to select a trajectory intended to
+maintain separation. The two components are usually developed and evaluated separately. Prediction models are compared mainly using average displacement error (ADE) or final displacement error (FDE), usually without considering how their forecasts affect downstream control decisions~\citep{zhang2023flight,guo2024integrating}. Planning methods, in turn, are assessed using closed-loop measures such as conflict rate, minimum separation, and control effort~\citep{lindemann2023safe}. This evaluation practice rests on a common premise. More accurate forecasts are expected to support safer operation, and allowing the planner to guide predictor training is expected to provide further operational gains~\citep{huang2023differentiable,zhang2025bridging,mandi2024decisionfocused}.
+
+That premise is plausible, but it has not been established for low-altitude traffic operations. Within a prediction-then-planning pipeline, the operational effect of a forecast depends on how it changes the actions selected by the planner. ADE averages displacement errors across the prediction horizon, whereas FDE reports the error at the final prediction step. What matters for closed-loop safety, however, is whether a prediction error changes a maneuver at a time and location relevant to separation. Neither metric reveals whether this occurs. A planner that enforces separation through explicit constraints may also respond similarly to forecasts with very different displacement errors. It therefore remains unclear whether improvements in open-loop prediction, or training the predictor through the planner, translate into additional benefits in closed-loop operation. This raises two questions. Does the ranking of predictors by displacement accuracy carry over to their ranking by closed-loop safety? Does training the predictor through a separation-constrained planner provide an operational benefit beyond ordinary fine-tuning on the same closed-loop training encounters?
+
+Answering these questions requires a controlled closed-loop setting. Recorded flight tracks show what occurred under one sequence of actions, but they do not reveal how the same encounter would have unfolded under a different predictor or planner. We therefore develop \method, an interactive testbed that predicts the motion of surrounding aircraft, simulates the six-degree-of-freedom motion of the ego aircraft, and selects control actions subject to an explicit minimum-separation constraint. Prediction uncertainty is calibrated before it enters the planner, and the separation constraints are implemented using control barrier functions (CBFs). The testbed allows the same encounter to be replayed while changing one component at a time. It also includes a reference case in which the future trajectory of the neighbouring aircraft is known, helping distinguish conflicts caused by prediction error from those that remain even with perfect future information. Differentiability serves a narrower purpose. It allows the operational consequences of the planner's actions to be propagated back into predictor training. This enables a controlled comparison between planner-guided training and ordinary fine-tuning using the same encounter data and training conditions. We initially expected planner-guided training to provide an additional benefit in closed-loop operation.
+
+The analysis follows the layers introduced above through a sequence of
+controlled comparisons and robustness analyses. We first vary the
+predictor while holding the planner fixed to assess the role of
+prediction. We then retain the predictor and alter the planning layer
+to examine the contribution of explicit separation constraints and
+available manoeuvring authority. A reference case with known future
+trajectories distinguishes conflicts that improved prediction could
+prevent from those that persist even with perfect future information.
+Plant--model mismatch and stronger wind disturbances test robustness
+to departures from the nominal operating model. We additionally
+cross-evaluate Stage~2 predictors under two planning configurations to
+examine whether predictor-side differences retain the same closed-loop
+expression when the downstream planner changes. A sweep of available
+detection lead time then examines the value of additional response
+time. Finally, corridor simulations extend the analysis from individual
+encounters to mixed operations involving aircraft governed by different
+avoidance logics.
+
+
+
+Together, these analyses connect vehicle-level prediction and control to questions faced directly by traffic operators and airspace designers. They examine how prediction models should be evaluated when used for tactical separation and whether minimum maneuver-performance requirements should enter corridor admission criteria. They also consider how surveillance and airspace design should be assessed through the response time they provide, and what coordination challenges may arise when aircraft using different avoidance logics share a corridor.
+
+The contributions of this paper are summarized as follows.
+
+\begin{itemize}
+\item[(i)] We formulate tactical conflict management in low-altitude
+		corridors as a closed-loop transportation problem and develop
+		\method, a differentiable testbed that integrates multi-agent
+		trajectory prediction, separation-constrained planning, and
+		six-degree-of-freedom eVTOL dynamics within a common closed loop.
+
+	\item[(ii)] We design a controlled evaluation methodology for this
+problem. Single-change comparisons, paired encounter-level statistics,
+and a reference case with known future trajectories connect the
+open-loop displacement metrics by which predictors are usually judged
+to controller-in-the-loop separation outcomes. A matched training
+comparison, complemented by a directional decomposition of prediction
+errors, audits planner-guided predictor training against ordinary
+fine-tuning on the same encounter data, while cross-configuration
+evaluation tests whether predictor differences retain the same
+operational expression when the downstream planner changes.
+
+	\item[(iii)] We broaden the evaluation across operating conditions
+		and scales, from plant--model mismatch, wind disturbances, and
+		conflict-detection lead time to corridor operations in which
+		aircraft governed by different avoidance logics interact, thereby
+		connecting tactical conflict resolution to corridor-level safety,
+		delay, and throughput.
+
+\end{itemize}
+
+
+% =====================================================================
+% Section 2: Related Work
+% =====================================================================
+\section{Related work}
+\label{sec:related}
+
+This study draws on three research streams that have advanced largely
+in parallel. Aircraft trajectory prediction supplies the models under
+test, safe planning under predictive uncertainty supplies the planning
+layer, and the joint training of prediction and planning, developed in
+automated driving, supplies the hypothesis this study examines.
+Reviewing them in turn also explains why their intersection remains
+unexamined for low-altitude traffic operations.
+
+\subsection{Trajectory prediction and the yardstick it inherited}
+\label{sec:related-prediction}
+
+Deep learning has reshaped aircraft trajectory prediction over the
+past few years. In commercial aviation, Bayesian deep learning has
+brought weather-induced uncertainty into the forecast
+itself~\citep{pang2021data}, time--frequency wavelet
+representations have improved prediction by capturing non-stationary
+motion components~\citep{zhang2023flight}, and prediction models have
+begun to absorb air traffic control voice instructions as an
+additional input channel~\citep{guo2024integrating}. Trajectory prediction
+for low-altitude traffic remains considerably less developed. Recent
+UAM-specific studies have begun to narrow the gap, including
+deep-learning frameworks that pair trajectory prediction with
+downstream collision prediction~\citep{kim2025dlcollision} and
+graph-based models that forecast drone states from Remote~ID data to
+support separation monitoring~\citep{wen2025bidgcnllm}. Road traffic,
+by contrast, already supports a mature interaction-aware multi-agent
+prediction literature, in which heterogeneous road users are modelled
+jointly through graph attention over kinematically consistent
+representations~\citep{sheng2024kinematics} and long-horizon forecasts
+are grounded in recurring vehicle-following behaviour
+patterns~\citep{an2025longterm}. An equivalent body of work has yet to
+form for low-altitude traffic.
+
+Across learning-based trajectory prediction, performance is still
+assessed primarily through open-loop geometric errors, including
+average and final displacement error (ADE and FDE) in multi-agent
+motion forecasting and RMSE-based measures in aircraft trajectory
+prediction. These metrics quantify geometric accuracy, but they do
+not reveal whether a prediction error changes a safety-critical
+planning decision. The concern is beginning to surface in adjacent
+communities: \citet{liu2025risknet} integrate trajectory prediction
+with an explicit interaction-risk representation, illustrating a
+broader shift from purely geometric forecasting toward operationally
+relevant risk assessment. What is still missing is a direct test, for
+low-altitude operations, of whether ranking predictors by
+displacement accuracy also ranks them by closed-loop safety.
+Providing that test requires a planner in the loop, which is where
+the second stream enters.
+
+\subsection{Safe planning that treats the predictor as given}
+\label{sec:related-planning}
+
+Research on planning around uncertain traffic has produced two
+principled ways of consuming a forecast. Conformal prediction wraps
+the forecast in distribution-free uncertainty sets and enforces
+separation against the set rather than the point
+estimate~\citep{lindemann2023safe}, with extensions to partially
+observable settings~\citep{sheng2024safe} and to calibration under
+distribution shift~\citep{huang2025cuqds}. Control barrier functions
+instead encode separation through conditions that can render a
+prescribed safe set forward invariant when the constraints remain
+feasible. The construction was established for multi-robot collision
+avoidance through real-time quadratic
+programs~\citep{wang2017safety}, rests on a mature theory of safe
+learning-based control~\citep{brunke2022safe}, and has been extended
+to robust formulations coupled with reinforcement
+learning~\citep{emam2022sablas}, to learned certificates for
+black-box dynamics~\citep{qin2022sablas}, and, in transportation, to
+platoon-level safety in mixed-autonomy road
+traffic~\citep{zhou2024platoon}.
+
+Low-altitude traffic management has meanwhile developed its own
+planning stack. Conflict detection and resolution has a modeling
+tradition reaching back to \citet{kuchar2000review}. Recent work
+spans the strategic layer, where flight plans are deconflicted before
+departure~\citep{tang2023strategic}, the network layer, where traffic
+is assigned across routes to manage complexity and
+congestion~\citep{wang2023quasidynamic}, and the design of the
+airspace structures themselves~\citep{bauranov2021designing}. At the
+tactical layer, computational guidance methods resolve conflicts
+online during flight~\citep{yang2021autonomous}, including
+formulations that scale to many agents while carrying explicit
+separation assurance~\citep{yang2020scalable}, and integrated
+architectures now couple strategic demand management with
+learning-based tactical deconfliction~\citep{chen2024integrated}.
+
+A common feature of much of the planning literature reviewed above is
+that the predictor remains a fixed upstream module. Its outputs are
+passed to the planner, but the planner does not influence how the
+predictor is trained. The planning layer is engineered to tolerate
+whatever error the predictor delivers, which raises, but does not
+answer, the question of how much operational value a better predictor
+then adds. The third stream supplies a candidate answer.
+
+\subsection{Integrated prediction and planning, and the untested case}
+\label{sec:related-integrated}
+
+In automated driving, the separation between prediction and planning
+has begun to dissolve. \citet{huang2023differentiable} differentiate
+through an optimization-based planner so that planning cost helps
+supervise the predictor, and report improved closed-loop planning and
+prediction relative to a conventional two-stage pipeline. More
+broadly, end-to-end architectures increasingly treat prediction and
+planning within one trainable model~\citep{zhang2025bridging}. These
+developments are closely related to decision-focused learning, which
+is formalized in frameworks such as smart
+predict-then-optimize~\citep{elmachtoub2022smart}, with theory
+characterizing when two-stage learning forfeits performance and when
+it is already
+optimal~\citep{cameron2022perils,mandi2024decisionfocused}.
+Differentiable optimization layers such as OptNet provide one route
+for propagating decision losses through
+optimization~\citep{amos2017optnet}, while software frameworks such
+as PyEPO make predict-then-optimize training available across a
+broad range of linear and integer programs~\citep{tang2022pyepo}.
+
+A direct transfer of these gains to low-altitude corridors is not
+straightforward. eVTOL flight involves six-degree-of-freedom
+rigid-body dynamics with explicit actuator and flight-envelope
+constraints~\citep{acheson2024guam,campbell2024pyguam}, and urban
+airflow and weather introduce disturbances that vary strongly with
+the built environment~\citep{nithya2024wind,reiche2021initial}, with
+wind conditions already shown to constrain eVTOL operations and
+vertiport traffic flows in city-specific case
+studies~\citep{schweiger2023wind}.
+Conflict resolution must also be carried out in free
+three-dimensional space~\citep{rezaee2024collision}, with separation
+maintained continuously against forecasts of surrounding traffic,
+rather than within a planar lane structure. More importantly, the
+differentiable driving framework most directly comparable to the
+present study couples prediction and planning through a learned
+planning cost rather than an explicit minimum-separation
+constraint~\citep{huang2023differentiable}. Existing evidence
+therefore does not establish whether planner-guided prediction
+retains its value when separation is enforced as a constraint.
+
+End-to-end learning also exists in the aerial domain, but it
+addresses a different problem. Representative work maps onboard
+sensing directly to collision-free trajectories for a single vehicle,
+enabling agile flight through cluttered
+environments~\citep{loquercio2021learning}; it does not forecast the
+behavior of surrounding traffic, and it involves no separation
+constraint against such traffic. We have not identified prior work
+that trains a surrounding-traffic predictor through an explicit
+separation-constrained planner for low-altitude operations, and the
+closed-loop instrument of Section~\ref{sec:method} is built to study
+exactly that.
+
+One further tradition informs the system-level part of this study. Transportation research has long examined what happens when vehicles under different control logics share a facility, from the dependence of traffic flow stability and throughput on the penetration of connected and automated vehicles~\citep{talebpour2016influence} to field experiments in which a single controlled vehicle reshapes the surrounding
+traffic~\citep{stern2018dissipation}. That literature has since
+established that outcomes in mixed fleets depend not only on the share
+of automated vehicles but on how they are spatially arranged, since
+the tendency of automated vehicles to cluster alters the capacity
+attained at a given penetration rate~\citep{zhao2024clustering}; and
+reviews of continuum traffic-flow modelling in the connected and
+automated era emphasise that aggregate models must be re-examined
+rather than reused unchanged when a new class of controlled vehicles
+enters the stream~\citep{mohammadian2023continuum}. Our mixed-equipage
+corridor experiment poses the low-altitude form of that question,
+without presuming that the ground-traffic answers carry over.
+
+\section{Problem Formulation}
+\label{sec:problem}
+ 
+\subsection{Operational setting and scope}
+\label{sec:problem-setting}
+ 
+We consider a single aircraft under our control, referred to as the
+\emph{ego aircraft}, flying through a designated low-altitude corridor
+between two vertiports. The corridor supplies a reference route
+$\bm{r}_{0:T_{\mathrm{end}}}$, a nominal path with desired passage times
+that the aircraft is asked to follow. The state of the ego aircraft at
+discrete time $t$ is denoted $\bx_t \in \R^{n_x}$ and collects its
+position $\bm{p}_t \in \R^3$ together with its velocity and attitude. The
+control input $\bu_t \in \mathcal{U} \subset \R^{n_u}$ comprises the
+thrust and moment commands available to the vehicle, and the admissible
+set $\mathcal{U}$ encodes its actuator limits. Local wind acts on the
+vehicle as an unmeasured disturbance $\bw_t \in \R^3$; the decision
+system does not observe the wind realization. The motion of the ego aircraft is governed by
+discrete-time dynamics
+\begin{equation}
+	\label{eq:dynamics}
+	\bx_{t+1} = g(\bx_t,\, \bu_t,\, \bw_t),
+\end{equation}
+which is the only property of the vehicle needed to state the problem;
+the specific vehicle model and its numerical implementation are described
+in Section~\ref{sec:experiments}.
+ 
+The ego aircraft shares the corridor with other traffic. At each time $t$
+it observes a set of neighbouring aircraft $\mathcal{N}_t$, and for each
+neighbour $i \in \mathcal{N}_t$ it holds a window of recent observed
+states $H^i_t$, obtained from broadcast position reports or onboard
+tracking. The collective history is denoted
+$H_t = \{H^i_t\}_{i \in \mathcal{N}_t}$. Future motion of the neighbours
+is not known to the ego aircraft.
+ 
+Operations in the corridor are evaluated against a prescribed minimum
+separation threshold $d_{\mathrm{sep}} > 0$, a keep-clear distance that
+the operation is expected to maintain around every other aircraft. At
+every instant, the ego aircraft is expected to remain at least
+$d_{\mathrm{sep}}$ away from each neighbouring aircraft,
+\begin{equation}
+	\label{eq:sep-requirement}
+	\big\| \bm{p}_t - \bm{p}^i_t \big\|_2 \;\geq\; d_{\mathrm{sep}}
+	\qquad \text{for all } t \text{ and all } i \in \mathcal{N}_t,
+\end{equation}
+where $\bm{p}^i_t$ is the true position of neighbour $i$. An encounter
+in which the distance falls below this threshold is classified as a loss
+of separation, even though no physical collision has occurred. The
+requirement~\eqref{eq:sep-requirement} is stated on true positions; how a
+system that only holds uncertain forecasts of those positions can act so
+as to satisfy it is precisely the design problem of the planning layer.
+ 
+Two remarks fix the scope of the study. First, joint planning among
+several controlled aircraft is outside the present scope. The
+controlled encounter-level experiments specialize to one neighbouring
+aircraft so that prediction--planning interactions and feasibility can
+be attributed in isolation. The formulation itself allows several
+neighbours, and the later corridor-scale extension permits each
+equipped aircraft to consider several neighbours simultaneously, but
+that extension is exploratory and does not perform the controlled
+multi-constraint feasibility attribution used in the single-neighbour
+experiments. Second, the static environment enters only through the
+corridor geometry and the reference route; richer map information,
+such as building shapes or restricted areas, is not part of the
+setting studied here.
+ 
+\subsection{Modular prediction and planning}
+\label{sec:problem-pipeline}
+ 
+In the prevailing pipeline, the decision process of the ego aircraft is
+organized as two modules connected in sequence.
+ 
+The first module is a trajectory predictor. It is a learned model
+$f_{\theta}$, with trainable parameters $\theta$, that maps the observed
+neighbour histories to a probabilistic forecast of where each neighbour
+will be over the next $T$ steps,
+\begin{equation}
+	\label{eq:predictor}
+	\widehat{\mathcal{T}}_t
+	= f_{\theta}\big( H_t \big)
+	= \big\{ q^{\,i}_{\theta}\big( \bm{p}^{i}_{t+1:t+T} \mid H^i_t \big)
+	\big\}_{i \in \mathcal{N}_t},
+\end{equation}
+where $q^{\,i}_{\theta}$ is a predictive distribution over the future
+positions of neighbour $i$. We write $\hat{\bm{p}}^{\,i}_{t+k \mid t}$
+for a point summary of this distribution, read as ``the predicted
+position of neighbour $i$ at time $t+k$, as forecast at time $t$,'' and
+the distribution carries an uncertainty representation that may vary
+with the prediction horizon and the encounter context. The concrete
+parameterization of both is introduced in Section~\ref{sec:method}.
+ 
+The second module is a planner. It is a decision rule $\pi_{\phi}$, with
+design parameters $\phi$, that selects the control action from the
+current state, the forecast, and the reference route,
+\begin{equation}
+	\label{eq:planner}
+	\bu_t = \pi_{\phi}\big( \bx_t,\,
+	\widehat{\mathcal{T}}_t,\,
+	\bm{r}_{t:t+T} \big).
+\end{equation}
+The planner used in this study is \emph{separation-constrained}. Among
+the actions consistent with the vehicle dynamics and actuator limits, it
+uses the forecast to select actions intended to satisfy the separation
+requirement~\eqref{eq:sep-requirement} over the planning horizon. Because
+the requirement refers to true future positions while the planner only
+holds uncertain forecasts, satisfying it involves keeping a margin around
+the predicted traffic; the form of this margin used in this study is
+specified in Section~\ref{sec:method}. The planner operates
+in a receding-horizon manner, meaning that only the first action of each
+plan is executed before the plan is refreshed with new observations at
+the next step.
+ 
+A structural feature of this pipeline matters for everything that
+follows. In the modular formulation considered here, information flows
+in one direction only. The predictor is trained beforehand, by comparing
+its forecasts against recorded trajectories; at operation time its
+output is handed to the planner, and the selected actions and realized
+closed-loop outcomes do not enter the predictor's training objective.
+The two
+modules are also evaluated separately in current practice, the predictor
+by how close its forecasts fall to recorded motion and the planner by the
+behaviour of the operating loop, and the next subsection makes both
+families of measures precise.
+ 
+\subsection{Prediction accuracy and operational performance}
+\label{sec:problem-objectives}
+ 
+\paragraph{Prediction accuracy.}
+The primary open-loop prediction measure considered in this study is
+displacement error, the straight-line distance between where a neighbour was predicted
+to be and where it actually went. Let $\mathcal{D}$ denote a collection
+of prediction instances, where each instance $\zeta$ records a forecast
+time $t_{\zeta}$, the observed histories at that time, and the realized
+positions over the following $T$ steps; a recorded episode typically
+contributes many such instances as the forecast time slides forward.
+Averaging over instances, neighbours, and the prediction horizon gives
+the average displacement error
+\begin{equation}
+	\label{eq:ade-loss}
+	\mathcal{L}_{\mathrm{pred}}(\theta)
+	= \frac{1}{|\mathcal{D}|} \sum_{\zeta \in \mathcal{D}}
+	\frac{1}{|\mathcal{N}_{\zeta}|\, T}
+	\sum_{i \in \mathcal{N}_{\zeta}} \sum_{k=1}^{T}
+	\big\| \hat{\bm{p}}^{\,i}_{t_{\zeta}+k \mid t_{\zeta}}
+	- \bm{p}^{i}_{t_{\zeta}+k} \big\|_2,
+\end{equation}
+where $\bm{p}^{i}_{t_{\zeta}+k}$ is the recorded position of neighbour
+$i$ and $\mathcal{N}_{\zeta}$ is the neighbour set of instance $\zeta$;
+in the single-neighbour encounters of this study,
+$|\mathcal{N}_{\zeta}| = 1$.
+Variants of the same idea, such as the error at the final prediction
+step only, are common. These displacement-based measures are
+\emph{open-loop}: they are computed by replaying recorded data, and no
+controller acts on the forecast while it is being scored.
+ 
+\paragraph{Operational performance.}
+The operating system, by contrast, is judged on what happens when the
+planner acts on the forecasts. Consider a mission episode $\xi$,
+comprising an initial state, the motion of the neighbouring traffic, the
+wind, and the reference route. Running the pipeline of
+Section~\ref{sec:problem-pipeline} on this episode produces a realized
+\emph{closed-loop} trajectory, so called because the aircraft's actions
+feed back into what it subsequently observes. This trajectory, and every
+quantity computed from it, depends jointly on the predictor parameters
+$\theta$ and the planner parameters $\phi$. Three quantities summarize the
+operational outcome of an episode.
+ 
+The first is the loss-of-separation indicator
+\begin{equation}
+	\label{eq:phi-los}
+	\Phi_{\mathrm{los}}(\theta, \phi;\, \xi)
+	= \mathbb{1}\Big\{ \min_{t,\; i \in \mathcal{N}_t}
+	\big\| \bm{p}_t - \bm{p}^i_t \big\|_2 < d_{\mathrm{sep}} \Big\},
+\end{equation}
+which equals one if the ego aircraft comes closer than the separation
+standard to any neighbour at any time during the episode, and zero
+otherwise. We refer to an episode containing at least one loss of
+separation as a \emph{conflict episode}, and to the fraction of conflict
+episodes in a set of encounters as the \emph{conflict rate}; this is the
+primary safety measure used throughout the paper. Its population
+counterpart is the closed-loop loss-of-separation risk
+\begin{equation}
+	\label{eq:conflict-risk}
+	\mathcal{C}(\theta, \phi)
+	= \E_{\xi \sim \mathcal{P}}\big[ \Phi_{\mathrm{los}}(\theta, \phi;\, \xi) \big],
+\end{equation}
+where $\mathcal{P}$ is the distribution of episodes in the target
+operation.
+ 
+The second is the terminal lateral deviation
+\begin{equation}
+    \label{eq:phi-dev}
+    \Phi_{\mathrm{dev}}(\theta,\phi;\xi)
+    =
+    \frac{1}{100}
+    \left\|
+    P_{\perp}
+    \left(
+    \bm{p}_{T_{\mathrm{end}}}
+    -
+    \bm{r}_{T_{\mathrm{end}}}
+    \right)
+    \right\|_2 ,
+\end{equation}
+where $P_{\perp}$ projects the terminal position error onto the plane
+transverse to the corridor reference axis. The factor $1/100$
+normalizes the terminal lateral displacement used in Stage~2 training.
+This term penalizes ending the training rollout away from the reference
+route rather than the time-averaged or maximum lateral excursion over
+the trajectory.
+
+The third is the control effort
+\begin{equation}
+	\label{eq:phi-effort}
+	\Phi_{\mathrm{effort}}(\theta, \phi;\, \xi)
+	= \sum_{t=0}^{T_{\mathrm{end}}-1} \| \bu_t \|_{R}^{2},
+\end{equation}
+a standard quadratic measure of how hard the actuators work over the
+episode, with weight matrix $R \succ 0$; it is a proxy for control
+activity rather than a physical energy measurement.
+ 
+Weighting these terms by non-negative coefficients that encode
+operator preferences, the closed-loop operation of the pipeline is
+summarized by the operational risk
+\begin{equation}
+	\label{eq:operational-risk}
+	\mathcal{R}_{\mathrm{op}}(\theta, \phi)
+	= \E_{\xi \sim \mathcal{P}}\!\Big[
+		\lambda_{s}\, \Phi_{\mathrm{los}}
+		+ \lambda_{d}\, \Phi_{\mathrm{dev}}
+		+ \lambda_{u}\, \Phi_{\mathrm{effort}}
+		\Big],
+\end{equation}
+where each term is evaluated at $(\theta, \phi;\, \xi)$. The
+coefficients absorb any normalization required to place terms with
+different physical units on a common scale. Further diagnostic
+quantities used in the evaluation, such as the conflict-detection lead
+time, are introduced together with the experimental protocol in
+Section~\ref{sec:experiments}.
+ 
+The open-loop prediction objective and the closed-loop operational
+objective differ in structure, and the difference is the crux of the
+paper.
+$\mathcal{L}_{\mathrm{pred}}$ depends on the predictor alone and can be
+computed from recorded data without ever running a controller.
+$\mathcal{R}_{\mathrm{op}}$ depends on the predictor and the planner
+jointly, and only through the trajectory their interaction produces. In
+current practice the predictor is trained and selected against the first
+measure, while the system it serves is judged by the second.
+ 
+This mismatch raises the first question studied in the paper. For the
+predictors evaluated here, and with the separation-constrained planner
+held fixed at a common configuration $\bar{\phi}$, does the ordering
+induced by open-loop displacement error $\mathcal{L}_{\mathrm{pred}}$
+agree with the ordering induced by closed-loop loss-of-separation risk
+$\mathcal{C}(\theta, \bar{\phi})$? If it does, displacement error is
+a faithful proxy and the prevailing practice of selecting predictors by
+that error rests on solid ground; if it does not, model selection based
+on displacement error need not deliver the safest closed-loop operation.
+ 
+The same mismatch also admits a constructive response, and this leads to
+the second question. Because the closed-loop outcome depends on
+$\theta$ through the planner, the training signal itself can be routed
+through the planner, so that operational consequences rather than
+displacement error alone shape the predictor's parameters. Whether doing
+so helps, however, is a separate matter from whether the predictor has
+seen the relevant encounters, since the same predictor can also be
+trained on the same encounter set, under matched training conditions, by
+displacement error alone. The second question is therefore whether
+training the predictor through the separation-constrained planner
+improves closed-loop operation beyond such matched fine-tuning that
+receives no signal from the planner.
+ 
+Answering either question requires the ability to run the same encounter
+repeatedly while changing one element at a time, which recorded flight
+data alone cannot provide. These two questions motivate the differentiable closed-loop framework,
+the matched comparison design, and the controlled experiments developed below.
+ 
+
+\section{Methodology}
+\label{sec:method}
+ 
+Answering the two questions posed at the end of
+Section~\ref{sec:problem} places three requirements on the study. The
+first question compares predictors by the closed-loop operation they
+induce, so it requires a closed loop that can be run repeatedly on the
+same encounters while the predictor is exchanged and the
+separation-constrained planner is held fixed. The second question asks
+whether a training signal that has passed through the planner carries
+value beyond exposure to the same encounters, so it additionally
+requires a differentiable path from the realized operational outcome
+back to the predictor parameters, together with a comparison design
+that separates the effect of the training signal from the effect of the
+training data. \method is the framework built to these requirements. It
+was designed under the working hypothesis that gradients routed
+through the planner would steer predictive capacity toward the
+situations that decide separation; the framework treats this as a hypothesis to be evaluated empirically in the closed loop.
+ 
+\subsection{Overview}
+\label{sec:method-overview}
+ 
+\begin{figure}[!t]
+	\centering
+	\includegraphics[width=\textwidth]{figures/figure1_architecture_v3.pdf}
+	\caption{Overview of the \method framework. At each control step,
+	the trajectory predictor $f_{\theta}$ maps the observed neighbour
+	histories to a probabilistic forecast, whose mean trajectory enters
+	the planning layer. The planning layer has two levels. A convex
+	quadratic program plans commanded accelerations over a short horizon
+	on a double-integrator surrogate model, subject to an acceleration
+	bound and to discrete-time control-barrier separation constraints
+	linearized along the lines of sight to the predicted neighbour
+	positions. A saturated inner control law then converts the first
+	commanded acceleration into thrust and body moments. The resulting
+	control acts on the full six-degree-of-freedom vehicle dynamics,
+	on which wind acts as an unmeasured disturbance, and the realized
+	closed-loop trajectory yields the operational quantities of
+	Section~\ref{sec:problem-objectives}. In Stage~2 training, the
+	task-aligned loss is back-propagated along the dashed feedback path,
+	through the vehicle dynamics, the inner law, and the quadratic
+	program, into the predictor parameters $\theta$; the planner
+	configuration $\phi$ is fixed throughout. A separate calibration branch consumes the empirical error distribution
+of that point forecast, supporting an empirical coverage check and the
+Conformal-MPC comparison.}
+	\label{fig:architecture}
+\end{figure}
+ 
+At each control step, \method composes three operations,
+\begin{equation}
+	\label{eq:method-composition}
+	\widehat{\mathcal{T}}_t = f_{\theta}(H_t),
+	\qquad
+	\bm{a}_{t \mid t}
+	= \mathrm{QP}_{\phi}\big( \bx_t,\,
+	\{\hat{\bm{p}}^{\,i}_{t+k \mid t}\}_{k \leq H_p},\,
+	\bm{r}_{t:t+H_p} \big),
+	\qquad
+	\bu_t = \mathrm{Inner}\big( \bx_t,\, \bm{a}_{t \mid t} \big),
+\end{equation}
+in which $f_{\theta}$ is the trajectory predictor of
+Section~\ref{sec:problem-pipeline}, $\mathrm{QP}_{\phi}$ is a convex
+planning program that outputs a commanded acceleration
+$\bm{a}_{t \mid t} \in \R^3$ from the point summaries
+$\hat{\bm{p}}^{\,i}_{t+k \mid t}$ of the forecast over a planning
+horizon $H_p$, and $\mathrm{Inner}$ is a low-level control law that
+converts the commanded acceleration into the thrust and body-moment
+command $\bu_t$ applied to the vehicle. The planner configuration
+$\phi$ collects the cost weights, the barrier coefficient, and the
+acceleration bound of the program. It is held fixed across the
+mainline predictor comparisons and the matched Stage 1b--Stage 2
+analysis, with alternative configurations appearing only in the
+designated baseline and sensitivity analyses; how it is selected is
+described in Section~\ref{sec:experiments}. Subsequent observations close the loop
+in the usual receding-horizon manner, and the realized trajectory
+evolves under the full vehicle dynamics~\eqref{eq:dynamics}, with wind
+acting as an unmeasured disturbance.
+ 
+The predictor answers where the surrounding traffic will be; the
+planning layer selects, within the vehicle's authority, a motion that
+tracks the route while keeping the required clearance from the
+predicted traffic; and the vehicle dynamics render the evaluation on
+the motion the aircraft actually flies. Two properties of the
+composition carry the study, and each is established where the first
+question or the second requires it.
+Section~\ref{sec:method-planner} states the sense in which the
+planning layer keeps the vehicle separated, with the same constraint construction applied to every
+compared predictor;
+Section~\ref{sec:method-diff} states the sense in which the
+composition can be differentiated back to $\theta$;
+Sections~\ref{sec:method-tasl} and~\ref{sec:method-training}
+construct the loss and the matched comparison design built on them.
+ 
+\subsection{Trajectory predictor and uncertainty calibration}
+\label{sec:method-pred}
+ 
+The predictor supplies two things to the study. The planning layer
+consumes a point forecast of each neighbour's future positions. A
+separate calibration branch consumes the empirical error distribution
+of that point forecast, supporting the coverage analysis of
+Section~\ref{sec:experiments} and one comparison arm. We describe the
+network, then the two outputs in turn.
+ 
+\paragraph{Network.}
+We instantiate $f_{\theta}$ as a shared per-neighbour sequence
+encoder. The observed history of a neighbour, a window of $L$ past
+positions, is augmented with finite-difference velocities, so that the
+encoder receives explicit motion cues rather than having to recover
+them; the resulting $L \times 6$ sequence is processed by a two-layer
+gated recurrent unit (GRU) with hidden width $128$, and the final
+hidden state passes through a two-layer perceptron to form a context
+vector. Three linear heads decode this context into, for every horizon
+step $k = 1, \dots, T$ and every mixture component
+$m = 1, \dots, K$, a mixture weight, a mean position, and a diagonal
+log-standard-deviation, the last clamped to a numerically safe range.
+The same network is applied to each neighbour independently, so the
+predictive distribution of Section~\ref{sec:problem-pipeline}
+factorizes per neighbour as the Gaussian mixture
+\begin{equation}
+	\label{eq:gmm-decoder}
+	q^{\,i}_{\theta}\big( \bm{p}^{i}_{t+k} \mid H^i_t \big)
+	= \sum_{m=1}^{K} \alpha^{i,m}_{t+k \mid t}\,
+	\mathcal{N}\!\big( \bm{\mu}^{i,m}_{t+k \mid t},\,
+	\Sigma^{i,m}_{t+k \mid t} \big),
+	\qquad
+	\Sigma^{i,m}_{t+k \mid t} \ \text{diagonal},
+\end{equation}
+with all parameters output by the network. The predictor is
+conditioned only on the observed motion history of the neighbouring
+aircraft. This matches
+the experimental design, in which neighbouring aircraft follow replayed
+trajectories whose futures do not react to the simulated wind or to the
+ego aircraft, so richer conditioning would introduce inputs with no
+causal relation to the prediction target. The encoder is deliberately
+kept simple. The predictor is one interchangeable element of a
+comparison that spans a wide range of predictive quality
+(Section~\ref{sec:experiments}), and a compact, transparent network
+keeps the comparison legible; the contribution of this paper does not
+lie in the encoder.
+ 
+The multi-modal head reflects that low-altitude conflict geometry
+admits qualitatively different continuations. A neighbouring aircraft
+approaching a crossing may turn, hold, or continue, and the mixture
+can represent these branches separately. The mainline controller,
+however, uses the mixture mean as a common point-forecast interface;
+the modal structure and the covariance outputs do not enter the
+mainline planning path. The point summary consumed by the planner is
+the mixture mean trajectory,
+\begin{equation}
+	\label{eq:mean-traj}
+	\hat{\bm{p}}^{\,i}_{t+k \mid t}
+	= \bar{\bm{\mu}}^{\,i}_{t+k \mid t}
+	= \sum_{m=1}^{K} \alpha^{i,m}_{t+k \mid t}\,
+	\bm{\mu}^{i,m}_{t+k \mid t},
+\end{equation}
+which realizes the point summary introduced abstractly in
+Section~\ref{sec:problem-pipeline}. The same trajectory is the
+quantity that the displacement error~\eqref{eq:ade-loss} scores. That
+one object serves simultaneously as the planner's input and as the
+target of the conventional accuracy metric is what makes the
+comparison between the two orderings of
+Section~\ref{sec:problem-objectives} concrete.
+ 
+\paragraph{Split-conformal calibration of the point-forecast error.}
+For the uncertainty-aware comparison arm and the coverage analysis, we
+calibrate an empirical error radius around the mixture-mean forecast;
+the calibration does not use the mixture covariances and does not
+alter the mainline planning path~\citep{lindemann2023safe}. The
+procedure is simple to state. On a calibration set of encounters
+disjoint from the training data and generated independently from the
+held-out trajectory pool, the frozen predictor is run, and the
+non-conformity score of each prediction instance is the Euclidean
+error of the mean trajectory,
+$s = \| \hat{\bm{p}}^{\,i}_{t+k \mid t} - \bm{p}^{i}_{t+k} \|_2$,
+collected over the look-ahead steps within the planning horizon. For a
+user-specified miscoverage level $\delta \in (0,1)$, the conformal
+radius is the finite-sample quantile
+\begin{equation}
+	\label{eq:conformal-radius}
+	r_{\mathrm{conf}}(\delta)
+	= \mathrm{Quantile}\!\left(
+	\{ s_j \}_{j=1}^{n_{\mathrm{cal}}};\;
+	\frac{\lceil (n_{\mathrm{cal}} + 1)(1 - \delta) \rceil}
+	{n_{\mathrm{cal}}}
+	\right),
+\end{equation}
+where the corrected quantile level, rather than the plain
+$1 - \delta$, is the standard small-sample adjustment of split
+conformal prediction. Under the exchangeability assumption between the
+calibration and deployment data, the radius carries the standard
+marginal coverage interpretation: with probability at least
+$1 - \delta$, the true neighbour position lies within
+$r_{\mathrm{conf}}$ of the predicted mean. The guarantee is marginal
+over the pooled neighbour--horizon prediction instances used for
+calibration; it is not a simultaneous trajectory-level coverage
+statement, and because scores drawn from the same encounter are
+mutually dependent, the radius is read as an empirical pooled quantile
+carrying this marginal interpretation. Two features of this study make that assumption unusually clean.
+The neighbour trajectories are replayed rather than reactive, so the
+distribution of prediction targets does not depend on the ego policy,
+and the planner configuration is fixed, so no feedback from training
+alters the deployment distribution.
+ 
+Calibration plays two roles in the study. First, it provides an
+empirical check of whether the target marginal coverage level is
+attained on independently generated evaluation encounters. Second, it
+defines the Conformal-MPC comparison, in which the same planning
+formulation is run with its separation threshold enlarged to
+$d_{\mathrm{sep}}+r_{\mathrm{conf}}$, while conflicts are still judged
+at the true operational threshold $d_{\mathrm{sep}}$. The mainline
+planner used by the other configurations enforces separation against
+the predicted mean with the fixed buffer $d_{\mathrm{sep}}$; forecast
+uncertainty therefore enters through the calibration analysis and the
+Conformal-MPC comparison, not through the mainline control path.
+ 
+\subsection{Separation-constrained planning layer}
+\label{sec:method-planner}
+ 
+Section~\ref{sec:problem-pipeline} left the planner abstract, as a
+rule that selects actions intended to satisfy the separation
+requirement~\eqref{eq:sep-requirement} against the predicted traffic.
+This subsection gives the layered realization used throughout the
+study. Planning is performed on a simplified motion model by a convex
+program that can be solved reliably at every control step and, for the
+purposes of Section~\ref{sec:method-diff}, differentiated; the
+program's output is then converted to vehicle commands by a low-level
+control law; and the commands act on the full vehicle dynamics, which
+appear only in the closed-loop rollout. Planning on a surrogate model
+while the plant runs at full fidelity is standard practice in
+hierarchical control, and it has a useful side effect here. The
+surrogate exposes the vehicle's manoeuvring authority as a single
+interpretable bound, which the experiments later vary as a controlled
+factor.
+ 
+\paragraph{From clearance to a barrier recursion.}
+The most direct encoding of separation would require, at every
+planned step, that the ego position stay outside each neighbour's
+keep-clear region. Imposed step by step this is brittle. A vehicle
+that is merely outside the region now can still be on a closing
+course, discovering the conflict only when avoidance is no longer
+within its authority. A discrete-time control barrier function
+constrains not only the current clearance but the rate at which
+clearance may shrink, so the vehicle is obliged to begin reacting
+while a correction is still cheap. Concretely, let $h \geq 0$ denote a
+clearance measure defined below. The barrier recursion
+\begin{equation}
+	\label{eq:cbf-condition}
+	h^{i}_{k} \;\geq\; (1 - \gamma)\, h^{i}_{k-1} - \epsilon^{i}_{k},
+	\qquad \gamma \in (0, 1],\quad \epsilon^{i}_{k} \geq 0,
+\end{equation}
+requires the clearance at step $k$ to remain at least a fraction
+$(1-\gamma)$ of its previous value, so that the margin may shrink by
+at most a fraction $\gamma$ per step, up to a slack $\epsilon^i_k$
+whose role is discussed below. The coefficient $\gamma$ sets how quickly the
+vehicle may consume its safety margin. A smaller $\gamma$ imposes a
+more conservative evolution of the clearance, whereas a larger
+$\gamma$ permits faster margin reduction. In our implementation
+$\gamma$ is a fixed constant of the compiled program. The
+differentiable solver compiles the optimization under
+disciplined-parametrized-programming rules; treating $\gamma$ as a
+program parameter would multiply it by expressions that already depend
+on other parameters through the recursion, which those rules forbid,
+so $\gamma$ is fixed before compilation. The value of $\gamma$, along
+with the other planner constants, is fixed before training; the
+selection protocol is described in Section~\ref{sec:experiments}.
+ 
+\paragraph{Clearance against the predicted traffic.}
+The clearance measure is built from the predicted mean positions. For
+neighbour $i$ and planned step $k$, let
+$\bm{n}^{i}_{k}$ be the unit vector from the predicted position
+$\hat{\bm{p}}^{\,i}_{t+k \mid t}$ toward the corresponding
+reference-route point, a linearization direction along which a local
+supporting half-space of the keep-clear region is constructed. The clearance is the
+linearized signed distance
+\begin{equation}
+	\label{eq:cbf-barrier}
+	h^{i}_{k}
+	= \bm{n}^{i\,\top}_{k}
+	\big( \bm{p}_{t+k \mid t} - \hat{\bm{p}}^{\,i}_{t+k \mid t} \big)
+	- d_{\mathrm{sep}},
+\end{equation}
+where $\bm{p}_{t+k \mid t}$ is the planned ego position. Because a
+unit-direction projection never exceeds the Euclidean norm,
+$h^i_k \geq 0$ implies
+$\| \bm{p}_{t+k \mid t} - \hat{\bm{p}}^{\,i}_{t+k \mid t} \|_2 \geq
+	d_{\mathrm{sep}}$; the constraint therefore keeps the planned
+position in a supporting half-space of the keep-clear ball around the
+predicted mean, a conservative linear sufficient condition for the
+separation requirement against that mean. The linearization is what
+renders every separation constraint affine in the decision variables,
+so the planning program below remains a convex quadratic program.
+ 
+\paragraph{The planning program.}
+At each control step $t$, the upper layer solves, on a
+double-integrator surrogate with planned positions $\bm{p}_k$,
+velocities $\bm{v}_k$, and commanded accelerations $\bm{a}_k$ (we
+abbreviate $\bm{p}_{t+k \mid t}$ as $\bm{p}_k$ inside the program, and
+likewise for $\bm{v}$ and $\bm{a}$),
+\begin{equation}
+	\label{eq:planning-qp}
+	\begin{aligned}
+		\min_{\bm{a},\, \bm{p},\, \bm{v},\, \bm{\epsilon}} \quad
+		 & w_{\mathrm{track}} \sum_{k=0}^{H_p}
+		\| \bm{p}_k - \bm{r}_{t+k} \|_2^2
+		+ w_{\mathrm{acc}} \sum_{k=0}^{H_p - 1} \| \bm{a}_k \|_2^2
+		+ w_{\mathrm{slack}} \sum_{i,k} \epsilon^{i}_{k}          \\
+		\text{s.t.} \quad
+		 & \bm{p}_0 = \bm{p}_t, \quad \bm{v}_0 = \bm{v}_t,        \\
+		 & \bm{p}_{k+1} = \bm{p}_k + \Delta t\, \bm{v}_k, \quad
+		\bm{v}_{k+1} = \bm{v}_k + \Delta t\, \bm{a}_k,
+		\quad k = 0, \dots, H_p - 1,                              \\
+		 & \| \bm{a}_k \|_{\infty} \leq a_{\max},
+		\quad k = 0, \dots, H_p - 1,                              \\
+		 & h^{i}_{k} \geq (1 - \gamma)\, h^{i}_{k-1}
+		- \epsilon^{i}_{k}, \qquad
+		\epsilon^{i}_{k} \geq 0,
+		\quad i \in \mathcal{N}_t,\; k = 1, \dots, H_p,
+	\end{aligned}
+\end{equation}
+with $h^i_0$ evaluated at the current ego and neighbour positions,
+under the convention $\hat{\bm{p}}^{\,i}_{t \mid t} := \bm{p}^i_t$
+that the zeroth forecast step is the currently observed position. At
+the boundaries of the horizon, $h^i_0$ enters only the first
+inequality and $h^i_{H_p}$ only the last, while each interior
+clearance $h^i_k$ enters the inequalities at steps $k$ and $k+1$. The program consumes the first $H_p$ steps of the $T$-step
+forecast, with the final predicted position held when the planning
+horizon exceeds the available forecast. The objective reads as the
+operator's own trade-off. Track the assigned route, spend little
+control effort, and respect the barrier recursion against every
+neighbour, all within the acceleration envelope $a_{\max}$ that
+summarizes the vehicle's manoeuvring authority on the surrogate model.
+The program is a single convex quadratic program per control step,
+solved through a differentiable convex-optimization
+layer~\citep{mandi2024decisionfocused}; its solution map is written
+\begin{equation}
+	\label{eq:solution-map}
+	\bm{a}_{t \mid t}
+	= \mathrm{QP}_{\phi}\big( \bx_t,\,
+	\{\hat{\bm{p}}^{\,i}_{t+k \mid t}\}_{k \leq H_p},\,
+	\bm{r}_{t:t+H_p} \big),
+\end{equation}
+where $\phi = (w_{\mathrm{track}}, w_{\mathrm{acc}},
+	w_{\mathrm{slack}}, \gamma, a_{\max}, H_p)$ collects the fixed
+configuration.
+ 
+The slack variables carry operational meaning that recurs in the
+analysis. A hard barrier recursion can become infeasible, most often
+when a predicted position closes in faster than the acceleration
+envelope can answer, and a planner with no recourse would fail to
+return a command. The slacks restore feasibility at a large linear penalty
+$w_{\mathrm{slack}}$. Under standard exact-penalty conditions and a
+sufficiently large weight, the softened program recovers a zero-slack
+solution whenever the hard program is feasible; we do not assume that
+this condition has been verified for every encounter. Positive slack is therefore read as a diagnostic of barrier pressure
+under the chosen objective and envelope, rather than as proof that no
+zero-slack solution exists; the later residual-conflict attribution
+uses it only in this diagnostic role.
+ 
+\paragraph{Inner control law.}
+The program's first commanded acceleration is converted to vehicle
+commands by a saturated feedback law. The commanded inertial
+acceleration, with gravity compensated, determines a desired thrust
+magnitude; the lateral components of the desired force determine
+target roll and pitch angles, clamped to a physical tilt envelope; and
+a proportional--derivative attitude loop converts the angle errors
+into body moments, clamped to the vehicle's moment limits. The
+resulting thrust-and-moment command $\bu_t$ is what acts on the full
+dynamics~\eqref{eq:dynamics}. Together with the acceleration bound of the program, these limits
+define the physical envelope within which avoidance must be
+accomplished.
+ 
+\paragraph{What the constraint construction guarantees.}
+The following statement records the safety property of the upper
+layer. It is deliberately stated for a single planning instant and on
+the planning model, and its limitations are discussed immediately
+after.
+ 
+\begin{proposition}[Forward invariance of the planned clearance]
+	\label{prop:forward-invariance}
+	Fix a planning instant $t$ and the predicted mean positions
+	$\{\hat{\bm{p}}^{\,i}_{t+k \mid t}\}$ available at that instant.
+	Suppose the program~\eqref{eq:planning-qp} is feasible without
+	slack ($\bm{\epsilon} = 0$) and $\gamma \in (0, 1]$. Then for every
+	neighbour $i$ with initial clearance $h^i_0 \geq 0$, the planned
+	trajectory satisfies $h^i_k \geq 0$ for all $k \leq H_p$, and
+	consequently
+	$\| \bm{p}_{t+k \mid t} - \hat{\bm{p}}^{\,i}_{t+k \mid t} \|_2
+		\geq d_{\mathrm{sep}}$ at every planned step.
+\end{proposition}
+ 
+\noindent\emph{Proof sketch.}
+Unrolling the recursion~\eqref{eq:cbf-condition} with
+$\bm{\epsilon} = 0$ gives $h^i_k \geq (1-\gamma)^k h^i_0 \geq 0$, and
+$h^i_k \geq 0$ implies the Euclidean separation by the half-space
+bound noted at~\eqref{eq:cbf-barrier}. The full argument is in the
+appendix.\hfill$\square$
+ 
+When the recursion is feasible without slack, the construction thus
+certifies that the planned motion keeps the required clearance from
+every predicted position over the horizon. We refer to the constraint
+construction in this role as a separation certificate, and to
+operation in which it remains feasible as certificate-governed; both
+terms are used in this conditional sense throughout the paper.
+ 
+Three qualifications delimit what is certified, and each maps onto a
+quantity the experiments measure. First, the certificate binds the
+planned trajectory to the currently predicted positions; separation
+from the true traffic holds insofar as the prediction is adequate at
+the planned passing geometry, which is precisely the coupling between
+predictive quality and safety that the study interrogates rather than
+assumes. Second, the planner is executed in receding horizon, so the
+barriers are rebuilt at every step around refreshed predictions; the
+single-instant certificates chain into a closed-loop property only
+when each replanned program inherits a feasible, non-negative
+clearance from its predecessor, and when a refreshed prediction moves
+the keep-clear region faster than the envelope can answer, that
+inheritance may fail and positive slack may appear. Third, the certificate
+lives on the double-integrator surrogate, while the aircraft flies the
+full dynamics through the saturated inner law; surrogate--plant
+mismatch and the tilt and moment clamps bound how faithfully the
+planned motion is realized. The experiments therefore report
+separation on the realized trajectory, attribute residual conflicts
+through the slack signal, and treat the certificate as a per-instant
+construction rather than as a global claim.
+ 
+\subsection{Differentiating through the planning layer}
+\label{sec:method-diff}
+ 
+The second question of Section~\ref{sec:problem} requires a training
+signal that originates in the realized closed-loop outcome and reaches
+the predictor parameters. Two links in the chain need care, and each
+rests on one condition stated here.
+ 
+The first link is the rollout itself. The training signal is measured
+on the realized trajectory, so its gradient must pass backward through
+the closed-loop dynamics.
+ 
+\begin{assumption}[Smooth vehicle dynamics]
+	\label{ass:dynamics}
+	The dynamics map $g$ in~\eqref{eq:dynamics} is continuously
+	differentiable in the state and the control, with Jacobians bounded
+	on the compact operating envelope of the study.
+\end{assumption}
+ 
+Under Assumption~\ref{ass:dynamics}, back-propagation through the
+rollout is well defined. The inner control law of
+Section~\ref{sec:method-planner} admits an almost-everywhere
+derivative and transmits the signal from the realized motion to the
+commanded acceleration; within saturated regions this derivative
+vanishes, a reflection of the same finite actuation envelope that
+bounds avoidance itself.
+ 
+The second link is the planning program. The program is an
+optimization rather than a closed-form map, but its solution still
+varies smoothly with its inputs wherever the set of constraints active
+at the optimum does not change. Intuitively, a small displacement of a
+predicted neighbour position tilts the half-spaces
+of~\eqref{eq:cbf-barrier} slightly, and the optimal accelerations move
+by a correspondingly small, computable amount, obtained by
+differentiating the optimality conditions that the solution satisfies.
+ 
+\begin{proposition}[Existence of planning-layer gradients]
+	\label{prop:gradient}
+	Suppose the program~\eqref{eq:planning-qp} has a locally unique
+	primal--dual solution at which the active constraint gradients are
+	linearly independent, strict complementarity holds, the reduced Hessian is positive
+	definite, and every predicted position lies at distance at least
+	$\rho_{\min} > 0$ from its reference point, so that the
+	linearization directions are well defined. Then the solution
+	map~\eqref{eq:solution-map} is continuously differentiable in the
+	predicted mean positions $\{\hat{\bm{p}}^{\,i}_{t+k \mid t}\}$ in
+	a neighbourhood of the current inputs, and the derivative is
+	obtained by solving the linearized Karush--Kuhn--Tucker system of
+	the quadratic program at its
+	solution~\citep{mandi2024decisionfocused,chen2021projection}.
+\end{proposition}
+ 
+\noindent\emph{Proof sketch.}
+Under the stated regularity, the optimality system is a smooth system
+of equations whose Jacobian in the primal--dual variables is
+non-singular; the implicit function theorem yields differentiability
+of the primal solution in the program parameters, which are themselves
+smooth functions of the predicted positions
+through~\eqref{eq:cbf-barrier}. Details are in the
+appendix.\hfill$\square$
+ 
+The result applies locally, away from active-set changes, degenerate
+solutions, and the switching boundaries of the saturations in the
+inner law. With these two links, an
+operational loss evaluated on the realized trajectory admits a
+well-defined gradient with respect to $\theta$, flowing through the
+vehicle dynamics, the inner law, the quadratic program, and the
+predictor's mean trajectory. This path is the formal content of the
+design hypothesis stated in the section opening. Whether the signal
+it carries has operational value beyond data exposure is the empirical
+question, and the loss that generates the signal is constructed next.
+ 
+\subsection{Task-aligned surrogate loss}
+\label{sec:method-tasl}
+ 
+The differentiable path determines where gradients can flow; the loss
+determines what they encode. The natural training target would be the
+operational risk~\eqref{eq:operational-risk} itself, but its safety
+term is unusable as a training signal. The loss-of-separation
+indicator~\eqref{eq:phi-los} is a zero--one outcome, so its gradient
+is zero almost everywhere and undefined at the threshold, and training
+on it would send no signal along the entire approach to a conflict. We
+therefore train against a smooth separation-violation penalty in place
+of the indicator, and retain the remaining terms of the risk, which
+are already differentiable almost everywhere.
+ 
+For an episode $\xi$ and the closed-loop trajectory it induces under
+parameters $\theta$, define the per-step clearance
+$\bar h_t = \min_{i \in \mathcal{N}_t}
+	\| \bm{p}_t - \bm{p}^{i}_t \|_2 - d_{\mathrm{sep}}$, positive when
+separated and negative when the threshold is breached. In the
+one-neighbour training encounters used here the minimum reduces to a
+single smooth clearance; with several neighbours it is differentiable
+almost everywhere. The surrogate is the time-averaged logistic
+proximity
+\begin{equation}
+	\label{eq:soft-los}
+	\widetilde\Phi_{\mathrm{los}}(\theta; \xi)
+	= \frac{1}{T_{\mathrm{end}}} \sum_{t=0}^{T_{\mathrm{end}} - 1}
+	\sigma\big( -\beta\, \bar h_t \big),
+\end{equation}
+where $\sigma$ is the logistic function and $\beta > 0$ sets the
+sharpness. The surrogate is near zero when the vehicle is comfortably
+separated, rises smoothly as clearance shrinks, and saturates once the
+threshold is breached. As $\beta \to \infty$ it approaches the
+fraction of rollout steps at which the threshold is violated, a
+time-averaged quantity distinct from the episode-level any-time
+indicator~\eqref{eq:phi-los}; it is used because it supplies a dense
+gradient over the entire approach to a conflict, rather than because
+it is a consistent surrogate of the episode-level risk.
+ 
+Aggregating over the training encounters, the task-aligned surrogate
+loss is
+\begin{equation}
+	\label{eq:tasl}
+	\mathcal{L}_{\mathrm{TASL}}(\theta)
+	= \E_{\xi \sim \mathcal{D}_{\mathrm{cl}}}\!\Big[
+		\lambda_{s}\, \widetilde\Phi_{\mathrm{los}}(\theta; \xi)
+		+ \lambda_{d}\, \Phi_{\mathrm{dev}}(\theta; \xi)
+		+ \lambda_{u}\, \Phi_{\mathrm{effort}}(\theta; \xi)
+		\Big]
+	+ \lambda_{a}\, \mathcal{L}_{\mathrm{ADE}}(\theta;\, \mathcal{D}_{\mathrm{cl}}),
+\end{equation}
+where the terminal lateral-deviation term $\Phi_{\mathrm{dev}}$
+from~\eqref{eq:phi-dev} and the control effort
+$\Phi_{\mathrm{effort}}$ from~\eqref{eq:phi-effort} are evaluated on
+the realized trajectory and are smooth, or piecewise smooth, in the
+parameters, and $\mathcal{L}_{\mathrm{ADE}}$ denotes the displacement
+objective $\mathcal{L}_{\mathrm{pred}}$ of~\eqref{eq:ade-loss},
+written with this subscript for emphasis. The displacement anchor $\lambda_a
+	\mathcal{L}_{\mathrm{ADE}}$ serves one purpose. Without it, the
+predictor could drift toward forecasts that happen to please the
+planner while no longer describing the data; the anchor holds the
+forecast to the recorded neighbour motion while the operational terms
+act, and it is evaluated on the same encounter batches as the
+operational terms. The non-negative weights
+$(\lambda_s, \lambda_d, \lambda_u, \lambda_a)$ encode the operator's
+trade-off, with the separation term dominant; the numerical values used in training are reported with the
+experimental protocol below.
+ 
+The contrast between $\mathcal{L}_{\mathrm{TASL}}$ and
+$\mathcal{L}_{\mathrm{ADE}}$ is the design's point. Under the
+displacement loss, every step of every predicted trajectory
+contributes to the training signal in proportion to its error, so
+predictive capacity is spent wherever error is large. Under the
+task-aligned loss, the operational part of the signal reaches the
+predictor only through the planner, and the planner is sensitive to
+the forecast only where its separation constraints bind. This
+localization can be stated precisely.
+ 
+\begin{proposition}[Support of the operational gradient]
+	\label{prop:gradient-support}
+	Under Assumption~\ref{ass:dynamics} and the regularity conditions
+	of Proposition~\ref{prop:gradient}, the gradient of the operational
+	part of~\eqref{eq:tasl} with respect to a predicted mean position
+	$\hat{\bm{p}}^{\,i}_{t+k \mid t}$ vanishes unless at least one
+	barrier inequality that is active at the program optimum depends on
+	the clearance $h^{i}_{k}$; through the
+	recursion~\eqref{eq:cbf-condition}, these are the inequalities at
+	steps $k$ and $k+1$ for neighbour $i$. Whenever no active
+	inequality depends on $h^{i}_{k}$, the only training signal
+	reaching that prediction is the anchor
+	$\lambda_a \nabla_\theta \mathcal{L}_{\mathrm{ADE}}$.
+\end{proposition}
+ 
+\noindent\emph{Proof sketch.}
+Differentiating the operational terms through the solution map gives a
+factor $\partial \bm{a}_{t \mid t} / \partial
+	\hat{\bm{p}}^{\,i}_{t+k \mid t}$ that, by the implicit-function form
+of the optimality system, has identically zero rows for parameters appearing only in inactive inequality constraints. A predicted position enters the program only through the clearance $h^{i}_{k}$, which appears in the inequalities at steps $k$ and $k+1$, so the gradient vanishes whenever both are inactive. The full argument is in the appendix.\hfill$\square$
+ 
+The direction of the surviving signal is determined by the local
+geometry of the active linearized constraints, and it is worth stating
+exactly. At an active pair, the predicted position enters the
+clearance~\eqref{eq:cbf-barrier} both directly and through the
+linearization direction, and with $\rho$ the range from the predicted
+position to its reference point, the derivative of the clearance in
+the predicted position is
+$-\bigl( \bm{n}^{i}_{k}
+	+ (I - \bm{n}^{i}_{k} \bm{n}^{i\,\top}_{k})
+	(\bm{p}_{t+k \mid t} - \hat{\bm{p}}^{\,i}_{t+k \mid t}) / \rho
+	\bigr)$,
+the linearization direction plus a transverse correction proportional
+to the orthogonal offset of the planned relative position. The extent to which the resulting parameter updates concentrate along
+the ego--neighbour passing geometry is therefore an empirical question
+examined later through the directional prediction-space analysis.
+ 
+The proposition establishes where the operational signal can act, and
+nothing about whether acting there helps. The design hypothesis that
+motivated the construction goes one step further, and we record it as
+a hypothesis rather than a result.
+ 
+\begin{hypothesis}[Accuracy reallocation]
+	\label{hyp:reallocation}
+	Relative to a predictor trained on the same encounters under the
+	displacement loss alone, training under
+	$\mathcal{L}_{\mathrm{TASL}}$ reduces the prediction error of the
+	mean trajectory more at prediction locations associated with active
+	barrier inequalities than elsewhere, and this concentration of
+	accuracy where separation is decided lowers the closed-loop
+	operational risk.
+\end{hypothesis}
+ 
+The hypothesis is tested empirically by comparing both the spatial distribution of prediction error and the closed-loop outcomes of the matched training schemes defined next.
+ 
+\subsection{Training schemes and matched comparison design}
+\label{sec:method-training}
+ 
+The second question of Section~\ref{sec:problem} asks whether
+training the predictor through the planner adds operational value
+beyond training the same predictor on the same encounters without the
+planner's signal. Answering it requires more than the differentiable
+path; it requires a comparison in which the training signal is the
+only element that varies. We therefore define three training schemes
+over a common predictor architecture and initialization,
+\begin{equation}
+	\label{eq:training-schemes}
+	\theta^{(1)}
+	\in \arg\min_{\theta}\,
+	\mathcal{L}_{\mathrm{S1}}\big(\theta;\, \mathcal{D}_{\mathrm{hist}}\big),
+	\qquad
+	\theta^{(1\mathrm{b})}
+	\in \arg\min_{\theta}\,
+	\mathcal{L}_{\mathrm{ADE}}\big(\theta;\, \mathcal{D}_{\mathrm{cl}}\big),
+	\qquad
+	\theta^{(2)}
+	\in \arg\min_{\theta}\,
+	\mathcal{L}_{\mathrm{TASL}}\big(\theta;\, \mathcal{D}_{\mathrm{cl}}\big),
+\end{equation}
+where $\mathcal{D}_{\mathrm{hist}}$ denotes the historical trajectory
+corpus and $\mathcal{D}_{\mathrm{cl}}$ the stream of closed-loop
+training encounters, identical for the second and third schemes. The
+Stage 1 objective $\mathcal{L}_{\mathrm{S1}}$ combines the mixture
+negative log-likelihood with a best-mode displacement term, the
+standard recipe for training multi-modal predictors; it supplies a
+training signal to all three output heads of
+Section~\ref{sec:method-pred}, including the mixture weights and the
+covariances. Stage 1b starts from the Stage 1 parameters and
+minimizes, on the closed-loop encounter stream, exactly the
+mixture-mean displacement objective $\mathcal{L}_{\mathrm{ADE}}$ that
+serves as the anchor term of the task-aligned loss.
+Stage 2 starts from the same parameters and trains on the same stream
+under the task-aligned loss, with the gradient routed through the
+planner. The argmin notation is conceptual; in practice each scheme is
+a finite training run under a matched protocol, and Stage 1b and Stage
+2 are matched in initialization, optimizer state, encounter order,
+and update budget, so that their intended difference is the training objective; their prediction-side terms are the same mixture-mean displacement objective, so the pair differs in the operational terms alone. The Stage 1 to Stage 1b contrast, by comparison, changes both the data distribution and the form of the prediction objective, and is read as a supporting comparison only. Because the neighbouring aircraft are
+replayed, the prediction targets seen by Stage 1b and Stage 2 are identical sample-for-sample.
+ 
+\begin{table}[t]
+	\centering
+	\caption{The three training schemes. All schemes share the
+		architecture, the Stage 1 initialization where applicable, and
+		matched training conditions; the planner configuration $\phi$ is
+		fixed throughout and is never updated by any scheme.}
+	\label{tab:training-schemes}
+	\begin{tabular}{lllcc}
+		\hline
+		Scheme   & Data & Loss & Planner gradient & Updates \\
+		\hline
+		Stage 1  & $\mathcal{D}_{\mathrm{hist}}$ (historical)
+		         & $\mathcal{L}_{\mathrm{S1}}$   & no  & $\theta$ \\
+		Stage 1b & $\mathcal{D}_{\mathrm{cl}}$ (encounters)
+		         & $\mathcal{L}_{\mathrm{ADE}}$  & no  & $\theta$ \\
+		Stage 2  & $\mathcal{D}_{\mathrm{cl}}$ (same encounters)
+		         & $\mathcal{L}_{\mathrm{TASL}}$ & yes & $\theta$ \\
+		\hline
+	\end{tabular}
+\end{table}
+ 
+The planner parameters $\phi$ remain fixed within each training run.
+The planner enters Stage~2 as a fixed differentiable operator that
+routes the task gradient to $\theta$; no planner parameter is updated
+by training. In the primary matched comparison, Stage-1b and Stage~2
+are evaluated under the same deployment planning configuration.
+Cross-configuration evaluations are introduced only as a separate
+robustness analysis. Table~\ref{tab:training-schemes}
+summarizes the design. Its last column is the point. The control stack is common to all
+schemes, and no scheme updates anything but $\theta$; attribution to
+the training objective alone is claimed for the matched pair. The
+comparison of Stage 1b with Stage 2 isolates the additional effect of
+the planner-routed training signal, which is the operational form of
+the second question of Section~\ref{sec:problem}. The comparison of
+Stage 1 with Stage 1b quantifies the combined effect of exposure to
+the encounter distribution and the accompanying change of prediction
+objective, a supporting contrast rather than a clean isolation. The
+first question is addressed separately, by evaluating predictors of
+different open-loop accuracy under the common planner configuration
+specified in Section~\ref{sec:experiments}.
+ 
+For Stage 2, the gradient that reaches the predictor is worth writing
+once, because it assembles the pieces established above. Applying the
+chain rule to the operational part of~\eqref{eq:tasl},
+\begin{equation}
+	\label{eq:stage2-gradient}
+	\frac{\partial \mathcal{L}_{\mathrm{TASL}}}{\partial \theta}
+	= \sum_{t}\, \sum_{i,\,k}\;
+	\underbrace{\frac{\partial \mathcal{L}_{\mathrm{TASL}}}
+		{\partial \bu_t}}_{\substack{\text{realized trajectory,} \\
+			\text{through the rollout}}}
+	\;
+	\underbrace{\frac{\partial \bu_t}{\partial \bm{a}_{t \mid t}}}
+	_{\text{inner law}}
+	\;
+	\underbrace{\frac{\partial \bm{a}_{t \mid t}}
+		{\partial \hat{\bm{p}}^{\,i}_{t+k \mid t}}}
+	_{\substack{\text{planner sensitivity} \\
+			(\text{Prop.~\ref{prop:gradient}})}}
+	\;
+	\underbrace{\frac{\partial \hat{\bm{p}}^{\,i}_{t+k \mid t}}
+		{\partial \theta}}_{\text{predictor Jacobian}}
+	\;+\; \lambda_a
+	\frac{\partial \mathcal{L}_{\mathrm{ADE}}}{\partial \theta},
+\end{equation}
+where the first factor accumulates through the closed-loop rollout
+under Assumption~\ref{ass:dynamics}, the planner sensitivity exists by
+Proposition~\ref{prop:gradient} and is non-zero only at predictions
+entering at least one active barrier inequality
+(Proposition~\ref{prop:gradient-support}). The equation shows in one
+line how an operational signal measured on the realized trajectory is
+routed back into the forecaster, and it delimits what the signal can
+express. Algorithm~\ref{alg:plangrad} summarizes the procedure.
+ 
+\begin{algorithm}[t]
+	\caption{Training schemes of \method}
+	\label{alg:plangrad}
+	\begin{algorithmic}[1]
+		\Require predictor $f_{\theta}$; fixed planner configuration
+		$\phi$; historical corpus $\mathcal{D}_{\mathrm{hist}}$;
+		encounter stream $\mathcal{D}_{\mathrm{cl}}$; loss weights
+		$(\lambda_s, \lambda_d, \lambda_u, \lambda_a)$.
+		\State \textbf{Stage 1 (offline pre-training).}
+		\For{mini-batch $\mathcal{B} \subset \mathcal{D}_{\mathrm{hist}}$}
+		\State $\theta \leftarrow \theta
+			- \eta_1 \nabla_{\theta}
+			\mathcal{L}_{\mathrm{S1}}(\theta; \mathcal{B})$
+		\EndFor
+		\State Save $\theta^{(1)} \leftarrow \theta$; initialize
+		$\theta^{(1\mathrm{b})} \leftarrow \theta^{(1)}$ and
+		$\theta^{(2)} \leftarrow \theta^{(1)}$, with the optimizer
+		states of both branches initialized identically.
+		\State \textbf{Stage 1b (matched fine-tuning).}
+		\For{mini-batch of encounters $\mathcal{B} \subset
+				\mathcal{D}_{\mathrm{cl}}$}
+		\State $\theta^{(1\mathrm{b})} \leftarrow \theta^{(1\mathrm{b})}
+			- \eta_2 \nabla_{\theta^{(1\mathrm{b})}}
+			\mathcal{L}_{\mathrm{ADE}}(\theta^{(1\mathrm{b})}; \mathcal{B})$
+		\EndFor
+		\State \textbf{Stage 2 (planner-guided training).}
+		\For{mini-batch of encounters $\mathcal{B} \subset
+				\mathcal{D}_{\mathrm{cl}}$ (same stream as Stage 1b)}
+		\For{episode $\xi \in \mathcal{B}$}
+		\State Roll out the closed loop: at each step, forecast
+		with $f_{\theta^{(2)}}$, solve~\eqref{eq:planning-qp}, apply
+		the inner law, propagate the vehicle
+		dynamics~\eqref{eq:dynamics}.
+		\EndFor
+		\State Compute $\mathcal{L}_{\mathrm{TASL}}(\theta^{(2)};
+			\mathcal{B})$ from~\eqref{eq:tasl} on the realized
+		trajectories.
+		\State $\theta^{(2)} \leftarrow \theta^{(2)}
+			- \eta_2 \nabla_{\theta^{(2)}}
+			\mathcal{L}_{\mathrm{TASL}}(\theta^{(2)}; \mathcal{B})$
+		\EndFor
+		\State \Return $\theta^{(1)}, \theta^{(1\mathrm{b})},
+			\theta^{(2)}$
+	\end{algorithmic}
+\end{algorithm}
+ 
+Stage~2 training back-propagates through the entire rollout. The
+gradient traverses the aircraft dynamics at every step, the inner
+control law, and the quadratic program's implicit derivative before
+reaching the predictor. The optimizer updates only the predictor
+parameters; the planner parameters themselves are not learned.
+Nevertheless, the fixed planner configuration enters the Stage~2
+update through the differentiable solution map and therefore shapes
+the gradient routed to the predictor. The experimental protocol below
+specifies the encounter generation, the planning configurations used
+during training and evaluation, the loss weights, and the
+cross-configuration robustness checks.
+ 
+\section{Closed-Loop Experiments and Results}
+\label{sec:experiments}
+
+\subsection{Experimental design}
+\label{sec:exp-design}
+
+The experiments run the closed loop repeatedly on controlled conflict
+encounters while exchanging one element at a time. Within each controlled comparison, the relevant arms share the
+simulator, the encounter stream, the evaluation harness, and every
+component other than the factor under study; the four predictor arms
+of the ranking comparison additionally share the same deployment
+planner configuration. The section first describes the environment, the data, the
+arms, and the protocol, and then reports the findings in the order the
+two questions of Section~\ref{sec:problem} pose them, followed by the
+analyses that establish the mechanism behind the answers and the
+conditions at which the answers change.
+
+\paragraph{Data and encounter construction.}
+The experiments use the open-source Generic Urban Air Mobility
+(GUAM) challenge-problem release, which provides $3{,}000$
+dynamically feasible trajectories for the NASA Lift+Cruise
+configuration together with a documented aircraft
+model~\citep{acheson2024guam,campbell2024pyguam}. GUAM contains
+single-aircraft mission trajectories rather than observed
+multi-aircraft corridor interactions. We therefore use the
+trajectories to construct controlled conflict encounters and do not
+interpret the resulting traffic patterns as representative of
+observed low-altitude operations.
+
+The $3{,}000$ trajectories are divided into a development pool and a
+held-out source pool. Trajectories $0$--$2{,}499$ are used for
+predictor training and for generating the closed-loop training
+encounters, while trajectories $2{,}500$--$2{,}999$ form the source
+pool for calibration and evaluation. Calibration and evaluation
+episodes are generated independently from this pool using separate
+random seeds and independently sampled transformation parameters, so
+that no episode is reused across the two sets.
+
+Each encounter pairs the ego aircraft with one non-reactive
+neighbouring aircraft following a replayed GUAM trajectory. The
+trajectory is transformed so that the nominal closest approach falls
+below the prescribed separation standard,
+$d_{\mathrm{sep}}=30$\,m, creating a controlled geometry in which an
+avoidance response is required. The neighbouring aircraft follows its
+replayed trajectory throughout the encounter and does not react to
+the ego aircraft. The encounter-level experiments consider one
+neighbour at a time so that the interaction between prediction and
+planning can be examined without additional multi-aircraft
+confounding. Trajectories are resampled at $\Delta t=0.2$\,s. The
+predictor receives an observation window of $L=25$ steps (5\,s) and
+produces a $T=30$ step (6\,s) forecast. For the primary evaluation, each closed-loop episode spans
+$20$ simulation steps ($4.0$\,s), with the nominal closest approach
+placed at step~$10$ ($2.0$\,s after the episode begins). This nominal
+CPA is a construction parameter of the unaltered encounter geometry;
+the realized closest approach may occur at a different step once the
+ego aircraft manoeuvres and responds to disturbances.
+
+\paragraph{Closed-loop simulation.}
+Recorded trajectories reveal the outcome associated with one realized
+sequence of actions, but they do not provide the counterfactual
+outcomes required to compare different predictors and planners on the
+same encounter. Stage~2 training also requires gradients to propagate
+through the resulting closed-loop trajectory. We therefore implement
+the corridor environment as a differentiable simulator in PyTorch.
+
+The ego aircraft is propagated using a six-degree-of-freedom
+Lift+Cruise model parameterized from the GUAM configuration and
+integrated with a fourth-order Runge--Kutta scheme at
+$\Delta t=0.2$\,s. Wind is represented by a mesoscale mean flow
+perturbed by a corridor-scale Gaussian random field and is not
+observed by the decision system. The gust field has standard
+deviation $\sigma_g=3$\,m\,s$^{-1}$, with nominal scaling
+$\eta_w=0.3$, corresponding to a disturbance strength of
+$0.9$\,m\,s$^{-1}$. Larger disturbance levels are examined in the
+robustness analyses. The neighbouring trajectories remain replayed
+and therefore do not respond to either the simulated wind or the ego
+aircraft.
+
+\begin{table}[tb]
+    \centering
+    \small
+    \caption{Experimental configurations.}
+    \label{tab:arms}
+    \begin{tabular}{lllll}
+        \toprule
+        Configuration & Predictor & Planning layer & Data used & Purpose \\
+        \midrule
+
+        \textsc{Constant-Velocity}
+        & analytic
+        & CBF--MPC
+        & ---
+        & training-free predictor reference \\
+
+        \textsc{Fixed-Predictor}
+        & Stage 1
+        & CBF--MPC
+        & $\mathcal{D}_{\mathrm{hist}}$
+        & conventional predict-then-plan \\
+
+        \textsc{Stage-1b}
+        & Stage 1b
+        & CBF--MPC
+        & $\mathcal{D}_{\mathrm{cl}}$
+        & displacement-fine-tuning baseline \\
+
+        Stage~2 (\method)
+        & Stage 2
+        & CBF--MPC
+        & $\mathcal{D}_{\mathrm{cl}}$
+        & task-aligned training \\
+
+        \textsc{Conformal-MPC}
+        & Stage 1
+        & CBF--MPC, calibrated margin
+        & $\mathcal{D}_{\mathrm{hist}}+\mathcal{D}_{\mathrm{cal}}$
+        & uncertainty-aware planner baseline \\
+
+        \textsc{Vanilla-MPC}
+        & Stage 2
+        & soft penalty, no CBF
+        & $\mathcal{D}_{\mathrm{cl}}$
+        & certificate ablation \\
+
+        \textsc{Soft-IPP}
+        & joint (soft)
+        & soft penalty, no CBF
+        & $\mathcal{D}_{\mathrm{cl}}$
+        & joint training without certificate \\
+
+        \textsc{Oracle}
+        & true future
+        & CBF--MPC
+        & ---
+        & zero-error forecast reference \\
+
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Experimental configurations.}
+Table~\ref{tab:arms} summarizes the configurations used in the
+controlled comparisons. \textsc{Constant-Velocity},
+\textsc{Fixed-Predictor}, \textsc{Stage-1b}, and Stage~2 (\method)
+use the same certificate-equipped deployment planner while varying
+the predictor supplied to it. These four configurations form the
+primary comparison used to examine whether ordering predictors by
+open-loop accuracy is preserved in closed-loop conflict outcomes.
+
+\textsc{Conformal-MPC} uses the Stage~1 predictor with the same
+planning formulation but enlarges the separation threshold by a
+split-conformal error radius. At miscoverage level $\delta=0.1$, the
+calibration set gives $r_{\mathrm{conf}}=18.93$\,m, so the planner
+uses an enlarged threshold of
+$d_{\mathrm{sep}}+r_{\mathrm{conf}}$ while conflicts continue to be
+evaluated at the operational $30$\,m standard. The calibration and
+evaluation sets each contain $3{,}000$ pooled prediction instances.
+On the independently generated evaluation encounters, the calibrated
+radius attains $90.8\%$ empirical pooled coverage against the
+$90\%$ target, with an evaluation-side $90$th-percentile error of
+$18.65$\,m.
+
+\textsc{Vanilla-MPC} retains the Stage~2 predictor but replaces the
+CBF constraints with a hinge-type soft separation penalty using the
+same planning horizon and actuation limits. \textsc{Soft-IPP} trains
+the predictor through this soft planner and provides a joint-training
+comparison without the explicit separation certificate.
+\textsc{Oracle} supplies the planner with the true future trajectory
+of the neighbouring aircraft and is used to distinguish prediction
+limitations from conflicts that persist even under perfect future
+information.
+
+\paragraph{Training protocol.}
+Stage~1 trains the probabilistic predictor on trajectories
+$0$--$2{,}499$ using the mixture negative log-likelihood together
+with a best-mode displacement term. Training uses Adam with learning
+rate $8\times10^{-4}$ for $30$ epochs and yaw augmentation across
+encounter orientations.
+
+Both \textsc{Stage-1b} and Stage~2 start from the same Stage~1
+checkpoint and use the same closed-loop encounter stream, encounter
+order, optimizer initialization, random seed, and update budget.
+\textsc{Stage-1b} performs displacement-only fine-tuning using the
+mixture-mean ADE objective. Stage~2 instead minimizes the task-aligned
+objective, which combines closed-loop separation, terminal lateral
+deviation, and control-effort terms with a displacement anchor. Both branches
+run for $70$ closed-loop iterations with learning rate
+$1\times10^{-4}$, batch size $16$, and rollout length $20$ steps.
+The task-aligned weights are
+$(\lambda_s,\lambda_d,\lambda_u,\lambda_a)
+=(3.5,0.05,0.01,0.12)$, with surrogate sharpness $\beta=0.3$.
+The comparison therefore controls for initialization, encounter
+exposure, optimizer setup, and training budget while contrasting
+displacement-only fine-tuning with the task-aligned training
+objective.
+
+We refer to
+\[
+(\gamma,H_p,a_{\max})=(0.4,8,10\,\mathrm{m\,s^{-2}})
+\]
+as the \emph{training-time planning configuration}. It is used for
+the primary Stage~2 training run and for the three independently
+trained Stage~2 robustness checkpoints, and was chosen to keep the
+differentiated planning problem short and numerically tractable.
+Closed-loop deployment evaluation uses
+\[
+(\gamma,H_p,a_{\max})=(0.1,15,20\,\mathrm{m\,s^{-2}}),
+\]
+hereafter the \emph{deployment planning configuration}. A separate
+Stage~2 checkpoint is trained under this deployment configuration.
+All five Stage~2 checkpoints are evaluated under the deployment
+planner, and Section~\ref{sec:results-boundary} additionally
+cross-evaluates them under the training-time planner to examine how
+the downstream planning configuration modulates the operational
+expression of predictor differences. \textsc{Soft-IPP} starts
+from the same Stage~1 initialization and uses the same encounter
+stream, learning rate, batch size, seed, and update budget as the
+other closed-loop fine-tuning schemes, but trains through the soft
+planner.
+
+\paragraph{Deployment planner and evaluation protocol.}
+The deployment planner configuration was selected from six candidate
+settings using the \method{} predictor and was subsequently held
+fixed across the certificate-equipped configurations, apart from the
+additional calibrated margin used by \textsc{Conformal-MPC}. The
+same configuration was recovered when the candidate settings were
+re-evaluated on an independently generated encounter stream
+(seed $999$). Because the primary evaluation stream contributed to
+the initial planner selection, the absolute conflict rates reported
+below are interpreted as controlled stress-test outcomes rather than
+unbiased estimates of population-level operational risk.
+
+The primary comparison uses $n=200$ evaluation encounters with seed
+$12345$, which controls the encounter sampler, wind field, and the
+Python, NumPy, and PyTorch random generators; conformal calibration
+uses seed $777$. Four quantities characterize each configuration.
+ADE is the open-loop displacement error of the predicted mean
+trajectory. Conflict rate (CR) is the percentage of encounters in
+which the realized separation falls below $d_{\mathrm{sep}}$ at
+least once. Mean MinSep is the average, across encounters, of the
+minimum realized separation attained within each encounter. Effort is
+the normalized quadratic control-activity measure defined for the
+closed-loop trajectory. The terminal lateral-deviation term remains part of the task-aligned
+training objective but is not used to rank configurations in the main
+comparison. Maximum lateral offset is reported separately as a
+supplementary trajectory-deviation diagnostic in the matched training
+analysis.
+
+The conflict outcomes are paired because every configuration is
+evaluated on the same encounters. For the four predictor
+configurations sharing the deployment planner, overall equality of
+the paired binary outcomes is assessed using Cochran's $Q$ test,
+followed by pairwise exact McNemar tests with Holm correction.
+Configuration-specific conflict rates are accompanied by Wilson
+$95\%$ confidence intervals. The corridor penetration analysis is
+reported separately as means and standard deviations over six
+independent replications.
+
+\subsection{Open-loop prediction accuracy and closed-loop conflict outcomes}
+\label{sec:results-ranking}
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Open- and closed-loop performance on the evaluation conflict encounters.}
+	\label{tab:main-comparison}
+	\begin{tabular}{llcccc}
+		\toprule
+		Configuration & Predictor
+		& CR (\%) $\downarrow$
+		& Mean MinSep (m) $\uparrow$
+		& ADE (m) $\downarrow$
+		& Effort \\
+		\midrule
+		\multicolumn{6}{l}{\emph{Common-planner predictor comparison}} \\
+		\textsc{Constant-Velocity}
+		& analytic
+		& 12.0 & 47.8 & 0.83 & 52.9 \\
+		\textsc{Fixed-Predictor}
+		& Stage 1
+		& 12.5 & 46.3 & 20.90 & 51.5 \\
+		\textsc{Stage-1b}
+		& Stage 1b
+		& 11.5 & 47.8 & 1.84 & 52.9 \\
+		\method
+		& Stage 2
+		& 11.0 & 47.7 & 4.32 & 52.3 \\
+		\midrule
+		\multicolumn{6}{l}{\emph{Calibrated-margin planner baseline}} \\
+		\textsc{Conformal-MPC}
+		& Stage 1
+		& 11.5 & 48.8 & 20.90 & 58.1 \\
+		\midrule
+		\multicolumn{6}{l}{\emph{Certificate-free configurations}} \\
+		\textsc{Vanilla-MPC}
+		& Stage 2
+		& 41.0 & 29.8 & 4.32 & 19.1 \\
+		\textsc{Soft-IPP}
+		& joint (soft)
+		& 53.0 & 29.1 & 6.45 & 17.0 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+The primary comparison evaluates whether the ordering induced by
+open-loop prediction accuracy is retained after the predictor is
+placed in the closed loop. Four configurations permit this comparison:
+\textsc{Constant-Velocity}, \textsc{Fixed-Predictor},
+\textsc{Stage-1b}, and \method{} all use the same certificate-equipped
+deployment planner and differ in the predictor supplied to it.
+\textsc{Conformal-MPC} uses the same Stage~1 predictor as
+\textsc{Fixed-Predictor} but modifies the planning threshold through
+the calibrated margin, and is therefore treated as a planner baseline
+rather than as part of the predictor ranking comparison. The two
+certificate-free configurations modify the planning layer itself and
+are considered in the subsequent mechanism analysis.
+
+Across the four common-planner configurations, ADE spans a
+twenty-five-fold range, from $0.83$\,m for
+\textsc{Constant-Velocity} to $20.90$\,m for
+\textsc{Fixed-Predictor}. The corresponding conflict rates remain
+within $11.0$--$12.5\%$, a range of only $1.5$ percentage points,
+while their mean minimum separations range from $46.3$ to
+$47.8$\,m. These mean values do not describe the lower tail of the
+separation distribution, which is examined below. Because the
+encounters were deliberately constructed to require conflict
+resolution, the reported rates are stress-test outcomes rather than
+estimates of naturally occurring operational risk.
+
+The paired encounter-level outcomes show the same pattern. The four
+common-planner configurations produce the same binary conflict
+outcome in $196$ of the $200$ encounters: $175$ remain conflict-free
+under all four predictors, while $21$ result in a conflict under all
+four. Only four encounters exhibit any disagreement across the
+predictor configurations. This high episode-level concordance is
+consistent with a shared-difficulty structure among the encounters;
+the source of the residual conflicts is examined in the subsequent
+mechanism analysis.
+
+Formal paired tests provide no evidence of an overall difference in
+conflict probability among the four configurations. Cochran's $Q$
+test gives $Q=5.00$ ($\mathrm{df}=3$, $p=0.17$), and none of the six
+pairwise exact McNemar tests is significant after Holm correction.
+Relative to \method{}, the discordant conflict counts are $2/0$ for
+\textsc{Constant-Velocity} ($p=0.50$), $3/0$ for
+\textsc{Fixed-Predictor} ($p=0.25$), and $2/1$ for
+\textsc{Stage-1b} ($p=1.00$). The Wilson $95\%$ intervals for the
+configuration-specific conflict rates are $[7.4,16.1]\%$ for
+\method{}, $[7.8,16.7]\%$ for \textsc{Stage-1b},
+$[8.2,17.2]\%$ for \textsc{Constant-Velocity}, and
+$[8.6,17.8]\%$ for \textsc{Fixed-Predictor}. These results should not
+be interpreted as evidence of equivalence. Rather, within the
+resolution of the present experiment, they do not support
+preservation of the ADE-based predictor ranking in closed-loop
+conflict outcomes under the common planner.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.8\linewidth]
+	{figures/fig01_ade_cr_decoupling.pdf}
+	\caption{Open-loop prediction error and closed-loop conflict rate.}
+	\label{fig:decoupling-scatter}
+\end{figure}
+
+Figure~\ref{fig:decoupling-scatter} makes the contrast between
+open-loop prediction error and closed-loop conflict outcomes explicit.
+\textsc{Constant-Velocity} attains the lowest ADE in the evaluated
+encounters but shows no detectable conflict-rate advantage under the
+common planner. Its low ADE is specific to the motion characteristics
+of the present encounter set and should not be interpreted as a
+general advantage of constant-velocity prediction.
+
+The pattern is not driven solely by the high-error
+\textsc{Fixed-Predictor}. Excluding that configuration still leaves an
+approximately five-fold ADE range ($0.83$--$4.32$\,m) among the
+remaining common-planner configurations, whose conflict rates differ
+by no more than one percentage point. In particular,
+displacement-based fine-tuning reduces the ADE of \textsc{Stage-1b}
+to $1.84$\,m, compared with $4.32$\,m for \method{}, without a
+detectable difference in conflict rate. Thus, within the $0.83$--$20.90$\,m ADE range spanned by the evaluated
+common-planner predictors, improvements in geometric prediction
+accuracy do not translate into a measurable reduction in
+threshold-crossing probability under the common planner.
+The same-predictor contrast that changes the planning layer rather
+than the predictor is examined next.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.8\linewidth]
+	{figures/fig02_minsep_ecdf.pdf}
+	\caption{Empirical cumulative distributions of realized minimum separation.}
+	\label{fig:minsep-cdf}
+\end{figure}
+
+Figure~\ref{fig:minsep-cdf} expands the binary conflict indicator into
+the full distribution of realized minimum separation. Because a
+conflict is defined by $\mathrm{MinSep}<30$\,m, the empirical
+cumulative probability immediately below the $30$\,m standard
+corresponds to the conflict rate. Around this threshold, the lower
+tails of the CBF-constrained configurations are closely aligned,
+consistent with their similar conflict rates. Descriptive differences
+remain above the threshold, most visibly in the somewhat left-shifted
+central portion of the \textsc{Fixed-Predictor} distribution,
+consistent with its lower mean minimum separation in
+Table~\ref{tab:main-comparison}. In the current zoomed view, the two
+certificate-free threshold crossings lie above the displayed
+ordinate range.
+
+The certificate-free configurations place substantially more
+probability below the $30$\,m standard, whereas some residual
+violations under the CBF-constrained configurations extend to minimum
+separations of approximately $11$\,m. The former shows that the
+closed loop remains sensitive to changes outside the predictor, while
+the latter shows that the common constraint layer does not eliminate
+all difficult encounters. These observations motivate the analysis
+of the planning layer and the attribution of residual conflicts in
+the following subsection.
+
+\subsection{Planning constraints, manoeuvring authority, and residual-conflict attribution}
+\label{sec:results-mechanism}
+
+The common-planner comparison showed that large differences in
+prediction accuracy do not produce detectable differences in conflict
+rate under the deployment planner. This leaves two related questions:
+whether the planning layer itself accounts for the much larger
+variation in closed-loop outcomes, and why a non-negligible set of
+conflicts remains even when the separation constraint is active. We
+address these questions by first changing the planning regime while
+holding the predictor fixed, then examining the feasibility structure
+of the residual conflicts and their response to perfect future
+information. A planner-parameter sweep subsequently tests whether the
+same residual behaviour is sensitive to the available manoeuvring
+authority, and plant--model mismatch experiments assess whether these
+patterns persist when the realized aircraft dynamics depart from the
+planner model.
+
+\paragraph{Effect of the separation constraint.}
+
+To separate the effect of the planning layer from that of the
+predictor, we first compare \method{} with \textsc{Vanilla-MPC}.
+Both configurations use the same Stage~2 predictor and therefore have
+the same ADE of $4.32$\,m; the principal change is that
+\textsc{Vanilla-MPC} replaces the CBF separation constraints with a
+soft repulsion penalty. Removing the CBF constraints increases the
+conflict rate from $11.0\%$ to $41.0\%$, while mean minimum
+separation decreases from $47.7$ to $29.8$\,m. This contrast is much
+larger than the variation observed when the predictor is exchanged
+behind the common CBF planner.
+
+The joint-training configuration \textsc{Soft-IPP}, which also uses
+the soft planning regime, remains in the same high-conflict region,
+with a conflict rate of $53.0\%$. Because \textsc{Soft-IPP} differs
+from \textsc{Vanilla-MPC} in both predictor training and the
+closed-loop training objective, it is not interpreted as a matched
+ablation of joint training. Rather, it provides an additional
+certificate-free reference showing that the high conflict rate is not
+specific to a single soft-planner configuration.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.8\linewidth]{figures/fig03_effort_cr.pdf}
+	\caption{Control effort and conflict rate across planning configurations.}
+	\label{fig:effort-cr}
+\end{figure}
+
+Figure~\ref{fig:effort-cr} shows the corresponding relationship
+between control activity and conflict rate. The CBF-constrained
+configurations cluster at conflict rates of $11.0$--$12.5\%$ with
+mean control effort between approximately $51$ and $58$, whereas
+\textsc{Vanilla-MPC} and \textsc{Soft-IPP} have substantially lower
+effort, $19.1$ and $17.0$, together with conflict rates of $41.0\%$
+and $53.0\%$. The lower effort of the certificate-free configurations
+should therefore not be interpreted as an efficiency gain. It is
+associated with substantially higher conflict rates and is consistent
+with less active avoidance. \textsc{Conformal-MPC}, by contrast,
+incurs the highest mean effort among the CBF-constrained
+configurations because of its enlarged planning margin, without a
+detectable reduction in conflict rate relative to the common-planner
+predictor configurations.
+
+The same-predictor ablation therefore identifies the planning regime
+as a major source of the observed conflict-rate variation. It does
+not, however, explain the residual conflicts that remain under the
+CBF-constrained planner. We examine those episodes next.
+
+\paragraph{Attribution of residual conflicts.}
+
+The \method{} configuration contains $22$ conflict episodes among the
+$200$ evaluation encounters. A remaining possibility is that these
+episodes arise because prediction errors drive the closed loop into
+states from which the planner can no longer maintain separation. We
+use two complementary diagnostics to distinguish this explanation
+from limitations imposed by the planning and manoeuvring envelope.
+
+The first diagnostic evaluates the feasibility pressure encountered
+during the realized Stage~2 rollouts. For each of the $22$ conflict
+episodes and each of its $20$ rollout steps, the planning problem is
+re-solved while holding the realized prediction stream fixed and
+minimizing the barrier relaxation required to restore feasibility. A
+step is classified as hard-infeasible when the minimum required
+relaxation exceeds $1$\,mm.
+
+\begin{figure}[p]
+	\centering
+	\begin{subfigure}{\linewidth}
+		\centering
+		\includegraphics[width=\linewidth]{figures/fig05b_raster.pdf}
+		\caption{Minimum required barrier relaxation.}
+		\label{fig:attr-relaxation}
+	\end{subfigure}\\[6pt]
+	\begin{subfigure}{\linewidth}
+		\centering
+		\includegraphics[width=\linewidth]{figures/fig05c_oracle_depth.pdf}
+		\caption{Violation depth under Stage~2 and oracle replay.}
+		\label{fig:attr-oracle}
+	\end{subfigure}
+	\caption{Feasibility and oracle analysis of residual conflicts.}
+	\label{fig:attribution}
+\end{figure}
+
+Of the $440$ audited rollout steps, $414$ require more than
+$1$\,mm of barrier relaxation and are therefore classified as
+hard-infeasible. The result is insensitive to the precise numerical
+threshold over a wide range: the count remains $414$ for thresholds
+from $10^{-6}$ to $10^{-2}$\,m because no required relaxation falls
+within that interval. The violations are also substantial in
+magnitude. Of the $414$ hard-infeasible steps, $406$ require more
+than $1$\,m of relaxation and $139$ require more than $10$\,m.
+
+Within every residual-conflict episode, the hard-infeasible steps form
+a single contiguous interval beginning at the first rollout step and
+covering, on average, $18.8$ of the $20$ steps. The closest-approach
+step lies inside this interval in all $22$ episodes. Feasibility is
+recovered only near the end of those episodes whose infeasible
+intervals are shorter than the full rollout. These results show that
+the residual conflicts are not associated with isolated or marginal
+constraint violations; under the realized prediction stream, the
+planner operates for most of the encounter in a region where the hard
+barrier conditions cannot be satisfied within the specified planning
+and manoeuvring envelope.
+
+This feasibility audit is conditional on the realized prediction
+stream. Because earlier prediction errors may have influenced the
+states from which later planning problems are solved, the audit alone
+cannot determine whether a more accurate predictor could have avoided
+the infeasible region. The second diagnostic therefore replays the
+same $22$ episodes from their initial conditions while replacing the
+Stage~2 forecast with the true future trajectory of the neighbouring
+aircraft.
+
+None of the $22$ residual conflicts is resolved by the oracle replay.
+The oracle rollout itself requires active barrier relaxation at the
+closest-approach step in $20$ of the $22$ episodes; the remaining two
+have required relaxations below $10^{-6}$\,m at that step but still
+experience a loss of separation elsewhere in the rollout. Figure
+\ref{fig:attr-oracle} gives the corresponding violation depths,
+defined as
+$d_{\mathrm{sep}}-\mathrm{MinSep}$. The mean absolute change in
+violation depth between the Stage~2 and oracle replays is only
+$0.63$\,m, and no episode reaches the zero-violation rescue line.
+Across the full $200$-encounter set, the oracle reference yields
+$24$ conflicts, compared with $22$ under Stage~2. None of the
+$22$ Stage~2 residual conflicts is resolved by the oracle replay;
+instead, two different encounters conflict only under the oracle
+reference. The oracle is therefore used here as a zero-forecast-error
+diagnostic rather than as a guaranteed closed-loop safety upper bound.
+In this evaluation, replacing the learned forecast with the true future
+trajectory does not monotonically improve the closed-loop conflict
+outcome.
+
+Taken together, the feasibility and oracle analyses shift the
+explanation of the residual conflicts away from prediction error
+alone and toward the limits of the available planning and manoeuvring
+envelope. The next analysis tests this interpretation directly by
+varying the available acceleration authority.
+
+\paragraph{Sensitivity to manoeuvring authority.}
+
+If the residual conflicts are constrained by the manoeuvring envelope,
+their frequency should respond strongly to the amount of corrective
+acceleration available to the planner. We therefore evaluate the
+Stage~2 predictor over a $4\times4$ grid of barrier coefficients
+$\gamma$ and acceleration limits $a_{\max}$, using $n=200$
+encounters per grid point and holding the planning horizon at
+$H_p=15$.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.98\linewidth]{figures/fig11_landscape.pdf}
+	\caption{Conflict-rate sensitivity to barrier and acceleration-authority settings.}
+	\label{fig:planner-heatmap}
+\end{figure}
+
+The resulting surface is far more sensitive to $a_{\max}$ than to
+$\gamma$. Increasing the available acceleration authority from
+$5$ to $20$\,m\,s$^{-2}$ reduces the conflict rate by
+$59.0$--$70.5$ percentage points across the four values of
+$\gamma$, with a $70.5$-point reduction at the deployment value
+$\gamma=0.1$. By comparison, the span across $\gamma$ at fixed
+$a_{\max}$ is at most $10.5$ percentage points when
+$a_{\max}=5$\,m\,s$^{-2}$ and at most $2.5$ percentage points at
+the higher authority levels.
+
+The deployment configuration
+$(\gamma,a_{\max})=(0.1,20\,\mathrm{m\,s^{-2}})$ is one point on
+this $H_p=15$ surface. Re-evaluating that point on an independently
+generated encounter stream gives a conflict rate of $12.0\%$,
+compared with $11.0\%$ on the primary evaluation stream, a
+difference of one percentage point, or two encounters. The
+training-time configuration uses $H_p=8$ and therefore does not lie
+on the same surface even though its $(\gamma,a_{\max})$ coordinates
+can be shown for reference.
+
+The parameter sweep provides a direct complement to the oracle
+analysis. The CBF constraint substantially changes the outcome for a
+fixed predictor and acceleration envelope, while the acceleration
+sweep shows that the achievable closed-loop outcome is itself strongly
+constrained by the available manoeuvring authority. We therefore use
+the term \emph{manoeuvring-authority-limited} for the residual
+conflicts in the restricted operational sense that they remain
+unresolved under oracle prediction within the fixed planning and
+control envelope evaluated here. The term does not imply that no
+collision-free trajectory could exist under a different planning
+horizon, control architecture, or aircraft capability.
+
+\paragraph{Robustness to plant--model mismatch.}
+
+The preceding analyses use a planner whose surrogate dynamics and
+available authority are calibrated to the nominal aircraft model. In
+operation, however, mass, thrust effectiveness, response delay, and
+environmental disturbances may depart from their nominal values. We
+therefore perturb the simulated aircraft while keeping the planner
+model and its parameters unchanged. This test asks whether the
+advantage of the CBF-constrained planning regime persists when the
+commands optimized by the planner are executed by a mismatched plant.
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Conflict rates under plant--model mismatch.}
+	\label{tab:mismatch}
+	\begin{tabular}{lccc}
+		\toprule
+		Regime
+		& \method{} (CBF)
+		& \textsc{Fixed-Predictor} (CBF)
+		& \textsc{Vanilla-MPC} (no CBF) \\
+		\midrule
+		nominal
+		& 11.0 & 12.5 & 41.0 \\
+		mass $+20\%$
+		& 17.5 & 18.5 & 75.0 \\
+		mass $-15\%$
+		& 9.0 & 10.0 & 19.5 \\
+		inertia $+30\%$
+		& 12.0 & 12.0 & 42.5 \\
+		thrust efficiency $0.85$
+		& 16.5 & 18.5 & 68.5 \\
+		actuator delay $1$ step
+		& 18.5 & 22.0 & 54.0 \\
+		actuator delay $2$ steps
+		& 28.0 & 34.0 & 87.5 \\
+		wind shift
+		& 11.0 & 12.0 & 39.5 \\
+		combined four-factor shift
+		& 30.0 & 40.0 & 94.5 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+The wind-shift condition in Table~\ref{tab:mismatch} uses an
+independent wind-field realization with
+$\eta_w=1.0$ and $\sigma_g=5$\,m\,s$^{-1}$, giving a disturbance
+strength of $5.0$\,m\,s$^{-1}$, or approximately $5.6$ times the
+nominal value. The combined condition applies four perturbations
+simultaneously: mass $+20\%$, thrust efficiency $0.85$, a one-step
+actuator delay, and this independent wind shift. It does not include
+the inertia perturbation or the two-step delay.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.92\linewidth]{figures/fig06_robustness.pdf}
+	\caption{Conflict-rate sensitivity to plant--model mismatch.}
+	\label{fig:mismatch-robustness}
+\end{figure}
+
+The CBF-constrained configurations remain below
+\textsc{Vanilla-MPC} in every tested regime. Taking \method{} as the
+CBF reference, the conflict-rate gap to \textsc{Vanilla-MPC} ranges
+from $10.5$ to $64.5$ percentage points. The gap narrows to
+$10.5$ points under the reduced-mass condition, where the lighter
+plant increases the available response margin, but widens under
+several adverse perturbations. It reaches $57.5$ points for
+mass $+20\%$, $52.0$ points under reduced thrust efficiency,
+$59.5$ points under the two-step actuator delay, and $64.5$ points
+under the combined four-factor shift.
+
+Among the single-factor perturbations, the two-step actuator delay
+produces the highest conflict rate for the certificate-free
+configuration, $87.5\%$, and also raises the conflict rate of
+\method{} from $11.0\%$ to $28.0\%$. This sensitivity is consistent
+with the manoeuvring-authority diagnosis: delay reduces the rate at
+which corrective commands can be realized, even when the nominal
+acceleration authority available to the planner is unchanged.
+
+A separate wind-scaling sweep increases the disturbance strength from
+$0.9$ to $4.5$\,m\,s$^{-1}$ on the same encounter stream; conflict
+rates change by at most $1.5$ percentage points and mean minimum
+separation by at most $0.05$\,m in any configuration, so this sweep is
+treated as a robustness check on the nominal wind setting.
+
+The mismatch experiments therefore do not suggest that the nominal
+result is an artefact of exact plant--planner agreement. The magnitude
+of the CBF advantage varies with the perturbation and can narrow when
+the realized plant becomes easier to manoeuvre, as in the reduced-mass
+case, but the advantage remains positive across all tested conditions.
+Together with the feasibility, oracle, and acceleration-authority
+analyses, these results identify two distinct layers of the closed-loop
+mechanism: the separation constraint strongly affects how the
+available manoeuvring capability is used, while the manoeuvring
+envelope itself limits what the closed loop can achieve once the
+encounter becomes sufficiently demanding.
+
+\subsection{Operational and prediction-space effects of task-aligned training}
+\label{sec:results-signal}
+
+The preceding analyses show that, under the deployment configuration,
+closed-loop conflict outcomes are strongly shaped by the planning
+regime and the available manoeuvring authority. This does not by
+itself determine whether planner-informed predictor training provides
+additional value once the predictor has been exposed to the same
+conflict encounters. We therefore compare Stage~2 with
+\textsc{Stage-1b}, the displacement-fine-tuning baseline that starts
+from the same Stage~1 checkpoint and is matched in encounter exposure,
+training order, optimizer setup, and update budget. The comparison
+tests whether the task-aligned training objective provides an
+operational increment beyond displacement-only adaptation to the same
+encounter distribution.
+
+\paragraph{Matched operational comparison.}
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.9\linewidth]{figures/fig07_matched.pdf}
+	\caption{Matched operational differences between Stage~2 and Stage-1b.}
+	\label{fig:matched-forest}
+\end{figure}
+
+Under the nominal deployment condition, \textsc{Stage-1b} achieves a
+substantially lower open-loop ADE than Stage~2
+($1.84$ versus $4.32$\,m), but the two configurations produce nearly
+identical closed-loop outcomes. Their conflict rates are $11.5\%$ and
+$11.0\%$, respectively, with two encounters conflicting only under
+\textsc{Stage-1b} and one only under Stage~2
+(exact McNemar $p=1.00$). The paired difference in mean minimum
+separation, defined as Stage~2 minus \textsc{Stage-1b}, is
+$-0.04$\,m with a $95\%$ confidence interval of
+$[-0.35,\,0.27]$\,m. The corresponding control-effort difference is
+$-0.55$ with a $95\%$ interval of $[-1.68,\,0.58]$.
+
+Maximum lateral offset is included as a supplementary
+trajectory-deviation diagnostic rather than as the deviation term
+used in Stage~2 training. Its paired difference is $+0.52$\,m
+($95\%$ CI $[-1.11,\,2.14]$\,m), again with no detected difference
+between the two configurations. Figure~\ref{fig:matched-forest}
+summarizes these paired effects. For the conflict-rate comparisons in
+panel~(a), the counts printed at the right give the discordant
+episodes as
+(\textsc{Stage-1b}-only conflict, Stage~2-only conflict).
+
+The nominal result is not reversed under the selected plant--model
+mismatch conditions. Figure~\ref{fig:matched-forest}(a) additionally
+compares the same pair under mass $+20\%$, thrust efficiency $0.85$,
+a two-step actuator delay, and the combined four-factor shift defined
+in the preceding robustness analysis. The corresponding Stage-1b
+conflict rates are $17.0\%$, $16.0\%$, $30.0\%$, and $31.0\%$,
+compared with $17.5\%$, $16.5\%$, $28.0\%$, and $30.0\%$ for
+Stage~2. All paired risk-difference intervals include zero. Thus, the
+absence of a detectable operational increment in the nominal
+comparison is not reversed by these selected model-mismatch
+conditions.
+
+We next examine sensitivity to Stage~2 training. The primary Stage~2
+checkpoint is a separate independent training run, distinct from the
+three additional robustness checkpoints. The three additional
+checkpoints, trained independently under the same training-time
+planner, yield deployment conflict rates of $12.0\%$, $11.0\%$, and
+$11.5\%$, compared with $11.0\%$ for the primary checkpoint. Their
+corresponding ADEs are $7.93$, $5.77$, and $7.16$\,m, compared with
+$4.32$\,m for the primary checkpoint. The additional runs have a mean
+deployment conflict rate of $11.5\pm0.5\%$ and mean ADE of
+$6.96\pm1.09$\,m. Each run is compared with the fixed Stage-1b
+baseline on the paired encounter outcomes, and none shows a detected
+conflict-rate difference (exact McNemar $p=1.00$ in all three
+comparisons).
+
+The primary checkpoint therefore lies below the replicate range in
+open-loop ADE while remaining within the replicate range in
+deployment conflict rate, a descriptive observation consistent with
+the open-loop/closed-loop decoupling found in the main comparison.
+
+A further Stage~2 checkpoint trained under the deployment planner has
+an ADE of $9.05$\,m and produces a deployment conflict rate of
+$13.5\%$. Across all five Stage~2 checkpoints, deployment conflict
+rates occupy a narrow $11.0$--$13.5\%$ range despite substantial
+variation in training run and open-loop error. The three seed
+comparisons share the same Stage-1b outcome vector and are therefore
+used as training-stochasticity robustness checks rather than as
+independent tests of seed-to-seed differences. The same checkpoints
+are cross-evaluated under the training-time planner later in the
+analysis.
+
+
+
+Taken together, the matched comparison and the robustness checks show
+no detected operational increment from the task-aligned objective
+under the deployment planning configuration. This does not imply that
+the training procedures produce equivalent predictors: their
+open-loop errors differ, and the directional analysis below identifies
+a structured prediction-space difference. The cross-configuration
+analysis later tests whether these predictor-side differences retain
+the same operational expression when the downstream planner changes.
+
+\paragraph{Directional prediction-space signature.}
+
+The task-aligned loss can influence the predictor through the planning
+layer only where the planned actions are sensitive to predicted
+neighbour positions. Because per-step active-set logs are not
+available, we use a closest-point-of-approach-centred window,
+$|k-k_{\mathrm{CPA}}|\leq3$, as an operational proxy for the region
+in which separation constraints are most likely to be consequential.
+Prediction errors in this window are decomposed into a signed
+line-of-sight component $e_{\parallel}$ and an orthogonal magnitude
+$|e_{\perp}|$. Negative $e_{\parallel}$ means that the neighbouring
+aircraft is predicted closer to the ego aircraft than it is in the
+realized trajectory. Because multiple prediction steps from the same
+encounter are correlated, inferential comparisons are performed on
+episode-level aggregates.
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Directional decomposition of prediction error in the CPA-centred window.}
+	\label{tab:errdir}
+	\begin{tabular}{lccc}
+		\toprule
+		Predictor
+		& $e_{\parallel}$ (m, mean $\pm$ SE)
+		& frac.\ toward ego
+		& $|e_{\perp}|$ (m) \\
+		\midrule
+		Stage 1 (context)
+		& $-0.70 \pm 0.49$
+		& $53.8\%$
+		& 8.38 \\
+		Stage-1b
+		& $-0.18 \pm 0.24$
+		& $45.4\%$
+		& 0.68 \\
+		Stage 2 (\method)
+		& $-0.34 \pm 0.24$
+		& $54.6\%$
+		& 2.91 \\
+		\midrule
+		Stage 2 $-$ Stage-1b
+		& \multicolumn{3}{l}{
+		$-0.164$\,m;
+		$95\%$ CI $[-0.283,-0.045]$;
+		paired $t$ $p=0.007$;
+		Wilcoxon $p=0.001$} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.95\linewidth]{figures/fig09_fingerprint.pdf}
+	\caption{Directional prediction-error differences between Stage~2 and Stage-1b.}
+	\label{fig:fingerprint}
+\end{figure}
+
+The configuration-specific means in Table~\ref{tab:errdir} should be
+read descriptively. None of the three individual means provides the
+appropriate test of the training objective, because the encounter
+geometry is shared across configurations. The relevant quantity is
+the paired Stage~2--Stage-1b difference. Stage~2 shifts the
+episode-mean line-of-sight error by $-0.164$\,m relative to
+displacement-only fine-tuning
+($95\%$ paired-$t$ CI $[-0.283,-0.045]$\,m, $p=0.007$).
+A Wilcoxon signed-rank test gives the same qualitative result
+($p=0.001$). The bootstrap interval displayed in
+Figure~\ref{fig:fingerprint}, $[-0.280,-0.046]$\,m, closely agrees
+with the paired-$t$ interval.
+
+The direction of this shift is toward the ego aircraft along the
+line of sight and is therefore locally conservative with respect to
+the separation geometry. The magnitude is small in operational scale:
+$0.164$\,m is approximately $0.5\%$ of the $30$\,m separation
+standard. At the encounter level, $120$ of the $200$ encounters have
+a more negative episode-mean $e_{\parallel}$ under Stage~2 than under
+\textsc{Stage-1b}. The orthogonal error magnitude is descriptively
+larger for Stage~2 ($2.91$ versus $0.68$\,m), but no paired inference
+is attached to this quantity. The evidence therefore supports a small
+directional change in prediction space rather than a general
+improvement in prediction accuracy.
+
+Encounter~93 is an extreme observation under all three learned
+predictors and strongly affects their configuration-specific means.
+It does not drive the matched result. Excluding this encounter changes
+the Stage~2--Stage-1b paired difference only from $-0.164$ to
+$-0.171$\,m, with the corresponding $95\%$ interval remaining below
+zero ($[-0.290,-0.052]$\,m; $p=0.005$). The paired directional effect
+is therefore substantially less sensitive to this encounter than the
+individual predictor means.
+
+Stage~1 is retained in Table~\ref{tab:errdir} only as contextual
+information. It differs from Stage~2 in both encounter exposure and
+prediction-error scale and therefore does not provide the matched
+comparison required to attribute the directional difference to the
+fine-tuning objective.
+
+\paragraph{Accuracy allocation around closest approach.}
+
+A directional shift does not establish the stronger hypothesis that
+task-aligned training reallocates predictive accuracy toward the
+region in which separation decisions are made. To examine that
+hypothesis, we compare prediction error inside the CPA-centred window
+with error outside it. The CPA window contains all samples satisfying
+$|k-k_{\mathrm{CPA}}|\leq3$; the outside-window aggregate contains
+all available samples with $|k-k_{\mathrm{CPA}}|>3$.
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Prediction error inside and outside the CPA-centred window.}
+	\label{tab:rq5-profile}
+	\begin{tabular}{lccc}
+		\toprule
+		Predictor
+		& CPA window (m)
+		& Outside window (m)
+		& window/outside \\
+		\midrule
+		Stage 1
+		& 13.53 & 23.14 & 0.585 \\
+		Stage-1b
+		& 1.04 & 2.08 & 0.499 \\
+		Stage 2 (\method)
+		& 4.07 & 4.40 & 0.925 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[tb]
+	\centering
+	\begin{subfigure}{\linewidth}
+		\includegraphics[width=\linewidth]
+		{figures/fig08a_profile_stage1.pdf}
+		\caption{Stage~1 prediction-error profile.}
+		\label{fig:profile-a}
+	\end{subfigure}\\[4pt]
+	\begin{subfigure}{\linewidth}
+		\includegraphics[width=\linewidth]
+		{figures/fig08b_profile_matched.pdf}
+		\caption{Stage-1b and Stage~2 prediction-error profiles.}
+		\label{fig:profile-b}
+	\end{subfigure}
+	\caption{Prediction-error profiles around closest approach.}
+	\label{fig:error-profile}
+\end{figure}
+
+Figure~\ref{fig:error-profile} shows the local error profiles through
+seven steps from closest approach. The displayed range is intentionally
+limited to $|k-k_{\mathrm{CPA}}|\leq7$ to resolve the behaviour around
+the CPA-centred window; the outside-window values in
+Table~\ref{tab:rq5-profile} are computed from all available prediction
+samples satisfying $|k-k_{\mathrm{CPA}}|>3$, including samples beyond
+the range displayed in the figure. The figure and table therefore
+serve complementary purposes: the former shows the local profile,
+whereas the latter reports the full outside-window aggregate.
+
+The hypothesized concentration of prediction accuracy toward the
+CPA-centred region is not supported under either an absolute or a
+relative reading. In absolute terms, Stage~2 has a larger mean error
+inside the CPA window than the displacement-fine-tuned Stage-1b
+baseline ($4.07$ versus $1.04$\,m). Relative to the error outside the
+window, the Stage~2 ratio is also larger
+($0.925$ versus $0.499$). Thus, task-aligned training does not reduce
+prediction error preferentially in the CPA-centred proxy region
+relative to matched displacement-only fine-tuning.
+
+The prediction-space analyses therefore refine the operational null
+rather than overturn it. Under the deployment CBF configuration, the
+task-aligned objective produces a small, statistically detectable
+line-of-sight shift in the CPA-centred window, but it neither improves
+absolute prediction accuracy in that region nor concentrates accuracy
+there relative to the outside-window error. These changes have no
+detectable counterpart in conflict rate, minimum separation, control
+effort, or the supplementary lateral-offset diagnostic under the
+matched deployment comparison. The conclusion is specific to this
+constraint-governed regime; the following analyses examine the
+operating conditions under which the task-aligned objective regains
+closed-loop leverage.
+
+
+\subsection{Boundary conditions of the closed-loop findings}
+\label{sec:results-boundary}
+
+The preceding analyses were conducted at a specific operating point:
+the deployment planning configuration and a short tactical response
+window. The conclusions drawn at that point need not hold when either
+the time available for conflict resolution or the downstream planning
+configuration changes. We therefore examine two boundary conditions.
+The first varies the available detection lead time to determine whether
+the residual conflicts attributed to limited manoeuvring authority
+persist when the aircraft is given more time to respond. The second
+cross-evaluates Stage~2 checkpoints under the training-time and
+deployment planning configurations to determine whether predictor
+differences retain the same closed-loop expression when the downstream
+planner changes.
+
+\paragraph{Boundary in available detection lead time.}
+
+The residual-conflict analysis showed that replacing the learned
+forecast with the true future trajectory did not resolve the conflicts
+remaining under the deployment configuration. One possible
+explanation is that the conflict is identified too late for either a
+learned or an oracle predictor to make a material difference. To test
+this possibility, we vary the available time to closest approach while
+holding the encounter construction and deployment planner otherwise
+fixed. The lead-time sweep uses separately sampled encounters generated from
+the same held-out trajectory pool and the same encounter-construction
+procedure as the primary evaluation. At the $2$\,s condition, the
+nominal closest-approach timing matches that of the primary evaluation,
+but the sampled episodes are not identical. Results are therefore
+compared at the aggregate level, and no episode-wise paired inference
+is made between the primary and lead-time evaluation sets. 
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Conflict rate across available detection lead times.}
+	\label{tab:leadtime}
+	\begin{tabular}{lcccc}
+		\toprule
+		Lead time
+		& Stage 1
+		& Stage-1b
+		& \method
+		& Oracle \\
+		\midrule
+		$1$\,s  & 86.0 & 83.0 & 82.5 & 82.0 \\
+		$2$\,s  & 13.0 & 11.5 & 11.0 & 11.0 \\
+		$3$\,s  &  1.5 &  0.0 &  0.0 &  0.0 \\
+		$4$\,s  &  7.0 &  0.0 &  0.0 &  0.0 \\
+		$5$\,s  & 10.0 &  0.5 &  0.0 &  0.0 \\
+		$6$\,s  & 12.0 &  0.5 &  0.0 &  0.0 \\
+		$7$\,s  &  8.5 &  0.5 &  0.0 &  0.0 \\
+		$10$\,s &  0.5 &  0.0 &  0.0 &  0.0 \\
+		$20$\,s &  0.0 &  0.0 &  0.0 &  0.0 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.98\linewidth]{figures/fig10_leadtime.pdf}
+	\caption{Conflict rate across available detection lead times.}
+	\label{fig:leadtime}
+\end{figure}
+
+The effect of additional response time is sharp at the tactical
+endpoint. At a lead time of $1$\,s, conflict rates remain above
+$82\%$ for Stage-1b, Stage~2, and the oracle reference. At $2$\,s,
+the corresponding rates fall to $11.5\%$, $11.0\%$, and $11.0\%$.
+No Stage-1b, Stage~2, or oracle conflicts are observed at the
+$3$\,s point, and Stage~2 and the oracle remain conflict-free at all
+longer lead times on the tested grid.
+
+The episode-level attribution is consistent with the mechanism
+identified above. Of the $165$ Stage~2 conflicts at $1$\,s,
+approximately $98\%$ remain unresolved under the corresponding oracle
+reference and are therefore classified as
+manoeuvring-authority-limited under the fixed planning and control
+envelope. At $2$\,s, the same classification applies to approximately
+$95\%$ of the $22$ Stage~2 conflicts arising in that lead-time
+condition. From $3$\,s onward Stage~2
+has no residual conflicts to attribute. The comparison therefore
+indicates that additional response time can remove conflicts for which
+improved prediction alone provides little leverage at shorter lead
+times.
+
+The transition between the tested $2$- and $3$-s points initially
+raises a potential confounding issue because the deployment planning
+horizon is also $3.0$\,s
+($H_p=15$ at $\Delta t=0.2$\,s). We therefore repeat the Stage~2
+lead-time sweep with planning horizons of $H_p=8$, $15$, and $25$,
+corresponding to $1.6$, $3.0$, and $5.0$\,s.
+
+\begin{table}[tb]
+	\centering
+	\small
+	\caption{Stage~2 lead-time transition across planning horizons.}
+	\label{tab:leadtime-horizon}
+	\begin{tabular}{lccc}
+		\toprule
+		Lead time
+		& $H_p=8$ (1.6\,s)
+		& $H_p=15$ (3.0\,s)
+		& $H_p=25$ (5.0\,s) \\
+		\midrule
+		$1$\,s & 82.0 & 82.5 & 82.5 \\
+		$2$\,s & 11.0 & 11.0 & 11.0 \\
+		$3$\,s &  0.0 &  0.0 &  0.0 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+The transition is unchanged across the three planning horizons. All
+three produce an $11.0\%$ conflict rate at $2$\,s and no observed
+conflicts at $3$\,s; the same zero-conflict outcome continues at
+$4$, $5$, and $7$\,s. In particular, the transition remains at the
+same lead time when the planning horizon is substantially shorter
+($1.6$\,s) or longer ($5.0$\,s) than $3$\,s. The coincidence
+between the deployment planning horizon and the observed $3$\,s
+transition is therefore not sufficient to explain the result within
+the tested horizon range.
+
+The numerical value of this transition should nevertheless not be
+interpreted as a universal response-time requirement. It is specific
+to the encounter geometries, closing-speed distribution, $30$\,m
+separation standard, and manoeuvring envelope used here. The result
+instead establishes a more limited operational point: for the tested
+encounters, increasing the available response window from $2$ to
+$3$\,s eliminates conflicts that persist even when the planner is
+given the true future trajectory, and this result is robust to planning
+horizons from $1.6$ to $5.0$\,s.
+
+Stage~1 follows a different pattern. It has the highest conflict rate
+of the four predictors at both tactical endpoints and develops a
+non-monotone response at intermediate lead times, rising from
+$1.5\%$ at $3$\,s to $12.0\%$ at $6$\,s before falling again.
+This intermediate increase is absent from Stage-1b, Stage~2, and the
+oracle reference. Repeating the experiment across the three planning
+horizons preserves the same qualitative Stage~1 pattern, while the
+oracle remains conflict-free over the corresponding intermediate
+range. The non-monotonicity is therefore not explained by an
+interaction between lead time and planning-horizon length. It is
+consistent with a predictor-specific effect associated with the
+Stage~1 forecast under the conflict-encounter distribution, although
+the present analysis does not identify its trajectory-level cause.
+
+\paragraph{Planner-dependent expression of predictor differences.}
+
+The matched comparison in the preceding analysis found no detectable
+operational increment from the task-aligned objective under the
+deployment planning configuration. This deployment result, however,
+does not establish that predictor-side differences would remain
+similarly muted under another downstream planner. We therefore
+cross-evaluate the Stage~2 checkpoints under two planning
+configurations: the deployment configuration
+\[
+(\gamma,H_p,a_{\max})=(0.1,15,20\,\mathrm{m\,s^{-2}})
+\]
+and the training-time configuration
+\[
+(\gamma,H_p,a_{\max})=(0.4,8,10\,\mathrm{m\,s^{-2}}).
+\]
+The latter is the planner used to train the primary Stage~2 checkpoint
+and its three independently trained robustness replicates. Because the
+two planning configurations differ jointly in barrier coefficient,
+planning horizon, and acceleration authority, the comparison is not
+interpreted as a one-factor test of constraint strength.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=0.96\linewidth]
+	{figures/fig12_planner_expression.pdf}
+	\caption{Planner-dependent expression of Stage~2 predictor differences.}
+	\label{fig:planner-expression}
+\end{figure}
+
+Figure~\ref{fig:planner-expression} shows a pronounced interaction
+between predictor checkpoint and evaluation planner. Under the
+deployment planner, the five Stage~2 checkpoints occupy a narrow
+conflict-rate range of $11.0$--$13.5\%$, a span of $2.5$ percentage
+points. The four checkpoints trained under the training-time planner
+produce rates of $11.0\%$, $12.0\%$, $11.0\%$, and $11.5\%$ in this
+deployment regime, while the checkpoint trained under the deployment
+planner yields $13.5\%$.
+
+The same checkpoints separate sharply under the training-time planner.
+The primary Stage~2 checkpoint and its three independently trained
+replicates produce conflict rates of $28.5\%$, $27.5\%$, $28.5\%$,
+and $27.0\%$, respectively. Their mean is $27.9\pm0.8\%$, and the
+episode-level improvement relative to Stage-1b is nested in all four
+runs: each resolves between $55$ and $58$ Stage-1b conflict episodes
+while introducing none. For the primary checkpoint, Stage-1b conflicts
+in $56.0\%$ of the encounters and Stage~2 in $28.5\%$, with
+$55$ against $0$ discordant episodes
+(exact McNemar $p=5.6\times10^{-17}$).
+
+The Stage~2 checkpoint trained under the deployment planner behaves
+very differently under the same training-time evaluation planner. Its
+conflict rate rises to $69.0\%$, $13.0$ percentage points above the
+Stage-1b reference. The paired outcome pattern is no longer nested:
+$9$ encounters conflict only under Stage-1b and $35$ only under this
+Stage~2 checkpoint (exact McNemar
+$p=1.06\times10^{-4}$). Relative to the primary Stage~2 checkpoint
+under the same planner, the difference is larger still: all conflicts
+of the primary checkpoint are contained in the deployment-trained
+checkpoint's conflict set, which adds $81$ further conflict episodes
+($0$ against $81$ discordant episodes; exact McNemar
+$p=8.27\times10^{-25}$).
+
+Average displacement error does not provide a monotone explanation for
+this divergence. The Stage-1b, primary Stage~2, and deployment-trained
+Stage~2 predictors have ADEs of $1.84$, $4.32$, and $9.05$\,m,
+respectively, while Stage~1 has an ADE of $20.90$\,m. Under the
+training-time planner, their conflict rates are $56.0\%$, $28.5\%$,
+$69.0\%$, and $56.5\%$, respectively. The large variation in
+closed-loop outcome therefore cannot be read from ADE ordering alone.
+
+The result is not evidence for a general matching rule in which a
+predictor performs best whenever its training and evaluation planners
+coincide. The primary Stage~2 checkpoint, for example, has a lower
+absolute conflict rate under the non-matching deployment planner than
+under its own training-time planner. Nor does the present experiment
+identify which change in $\gamma$, $H_p$, or $a_{\max}$ produces the
+modulation. What the cross-evaluation establishes is narrower: the
+downstream planning configuration strongly affects how differences
+among predictor checkpoints are expressed in closed-loop conflict
+outcomes. Those differences are compressed under the deployment
+planner but become much larger under the training-time planner.
+
+The four independently trained checkpoints on the training-time side
+show that the favourable $27$--$28.5\%$ result is reproducible across
+training stochasticity, including the nested episode pattern. Only one
+Stage~2 checkpoint is available from training under the deployment
+planner, however, so training-run stochasticity cannot be fully
+separated from training-configuration effects on that side.
+
+Together, the two boundary analyses qualify the earlier findings in
+different ways. The residual conflicts observed at short lead times
+can be removed by increasing the available response window, even
+without improving prediction accuracy. Separately, predictor
+differences that are weakly expressed under the deployment planner can
+become large under another planning configuration. The numerical
+transition times and cross-configuration effect sizes are specific to
+the tested encounter and aircraft settings. More broadly, prediction
+quality and predictor training cannot be assigned a fixed operational
+value independently of the downstream planning and manoeuvring
+environment in which they are evaluated.
+
+
+
+\subsection{System-level effects of mixed avoidance logics}
+\label{sec:results-corridor}
+
+The preceding experiments use controlled conflict encounters to
+isolate the effects of prediction, planning, training, manoeuvring
+authority, and response time. Such encounter-level comparisons do not
+capture a different operational question that arises under partial
+deployment: how aircraft governed by different avoidance logics
+interact when they share the same traffic stream. We therefore conduct
+an exploratory corridor-scale experiment in which
+\method-equipped aircraft operate together with aircraft controlled by
+optimal reciprocal collision avoidance (ORCA)
+\citep{vandenberg2011reciprocal}. The purpose of this experiment is
+not to rank the two avoidance methods in isolation, but to examine how
+system-level outcomes and group-specific performance change as the
+fleet composition varies.
+
+\paragraph{Corridor setting and mixed-equipage design.}
+
+The experiment uses a bidirectional corridor with aircraft entering
+from opposite ends under discrete-time Bernoulli arrivals. The
+corridor is $600$\,m long with a half-width of $120$\,m at an
+operating altitude of $100$\,m. Aircraft cruise at $25$\,m\,s$^{-1}$
+and interact with up to their three nearest neighbours within a
+$250$\,m sensing radius. \method-equipped aircraft use the deployment
+prediction and CBF-constrained planning stack, whereas unequipped
+aircraft use a fixed ORCA reciprocal-avoidance controller. The
+equipped fraction is varied over
+$p\in\{0,25,50,75,100\}\%$.
+
+Two demand levels are considered, with per-step arrival probabilities
+of $0.16$ and $0.06$ at each end of the corridor. Each
+demand--penetration condition is evaluated over six independent
+replications, with a $100$-step warm-up followed by a $400$-step
+evaluation horizon. Throughput is the number of completed corridor
+transits per minute. Delay is measured among completed transits as the
+excess travel time relative to free flow. An aircraft is counted as a
+conflict agent if its realized separation falls below the operational
+standard $d_{\mathrm{sep}}=30$\,m at least once during its transit.
+Aircraft leaving the prescribed lateral operating region are recorded
+separately as lateral exits. No timeout removals occur in these
+experiments, so non-completion is attributable to lateral exit.
+
+Both avoidance logics are evaluated against the same $30$\,m
+operational separation standard, but their internal constraint
+mechanisms are not dynamically equivalent. In particular, the
+CBF-constrained planner regulates the evolution of separation in
+addition to the geometric threshold, whereas ORCA uses reciprocal
+velocity constraints. The corridor experiment should therefore be
+read as a mixed-logic interaction study under the specified
+parameterizations rather than as a matched comparison of two planners.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[width=\linewidth]{figures/fig13_corridor.pdf}
+	\caption{Corridor-scale outcomes across mixed-equipage levels.}
+	\label{fig:corridor-penetration}
+\end{figure}
+
+\paragraph{Throughput and delay.}
+
+Figure~\ref{fig:corridor-penetration} summarizes the corridor
+outcomes at both demand levels. At high demand, mean system throughput
+does not decrease as the equipped fraction grows. It changes from
+$44.8\pm2.1$ passes/min at $p=0\%$ to
+$47.7\pm5.2$ passes/min at $p=100\%$, with intermediate values of
+$44.8$, $45.3$, and $46.8$ passes/min. The magnitude of this change
+is comparable to the between-replication variability, and we
+therefore interpret throughput as broadly maintained rather than as
+evidence of a systematic capacity increase.
+
+The clearer system-level pattern appears in completed-trip delay.
+Under high demand, mean system delay decreases from
+$6.5\pm1.4$\,s at $p=0\%$ to $2.6\pm0.6$\,s at
+$p=100\%$, with intermediate means of $4.3$, $3.9$, and
+$3.0$\,s. The ORCA-controlled subgroup shows the same direction over
+the mixed-equipage range: although its controller is unchanged, its
+mean delay decreases from $6.5$\,s at $p=0\%$ to
+$5.6$, $5.5$, and $4.4$\,s at $p=25\%$, $50\%$, and
+$75\%$, respectively. No ORCA subgroup exists at full equipage.
+
+Because the ORCA control law itself is held fixed across penetration
+levels, this decline provides an indicator of a positive cross-group
+efficiency effect: unequipped aircraft experience lower delay as a
+larger share of the surrounding traffic uses the equipped planning
+stack. This comparison is not paired across penetration levels,
+however, because the traffic realizations and group composition also
+change. It is therefore interpreted as a system-level externality
+pattern rather than as an isolated causal effect of equipage on an
+otherwise identical ORCA trajectory.
+
+The lower-demand experiment provides a second loading condition for
+the same interaction. Under low demand, system throughput is
+non-monotone, reaching its lowest value near $75\%$ equipage before
+partially recovering at full equipage. Meanwhile, the endpoint system
+delay decreases from $2.9\pm0.9$ to $1.4\pm0.5$\,s between zero
+and full equipage. The intermediate delay values are less monotone
+than in the high-demand case, but the endpoint comparison is
+consistent with the same qualitative reduction in completed-trip
+delay.
+
+\paragraph{Conflict outcomes and cross-group interaction.}
+
+The conflict-rate pattern is less monotone than the delay response.
+At high demand, the system-level conflict rate changes from
+$50.3\pm5.6\%$ at zero equipage to
+$57.2\pm3.5\%$, $53.3\pm6.7\%$, and
+$52.1\pm5.4\%$ at intermediate penetration levels, before reaching
+$47.7\pm12.2\%$ at full equipage. The increase at intermediate
+penetration is modest relative to the observed between-replication
+variability and is therefore treated descriptively rather than as an
+established deterioration in safety.
+
+The hollow markers in the conflict-rate panels of
+Figure~\ref{fig:corridor-penetration} show the six
+replication-level outcomes for the ORCA-controlled subgroup at each
+penetration level for which that subgroup is present. Their dispersion
+illustrates the variability underlying the aggregate means. A
+qualitatively non-monotone pattern also appears under the lower-demand
+condition. Taken together, these results do not establish a monotonic
+safety benefit from increasing equipage. They are instead consistent
+with the possibility that mixed avoidance logics introduce
+coordination effects at intermediate penetration, a mechanism that
+would require targeted pair-type or trajectory-level analysis to
+identify.
+
+The corridor conflict rates are intentionally interpreted as
+stress-test descriptors rather than estimates of operational
+population risk. Their relatively high absolute levels also make the
+experiment more informative about interaction patterns across control
+logics than about the absolute safety performance of either avoidance
+method.
+
+\paragraph{Corridor retention and interpretation.}
+
+The reduction in completed-trip delay is accompanied by a second,
+less favourable trend. Under high demand, the lateral-exit share
+increases from $0\%$ at zero equipage to approximately
+$1.5\%$, $4.2\%$, $4.4\%$, and $8.0\%$ as the equipped
+fraction rises. Under low demand, the lateral-exit share rises from approximately
+$0.9\%$ at zero equipage to a peak of $10.8\%$ at $75\%$ equipage,
+before decreasing slightly to approximately $9.9\%$ at full equipage. Because no
+aircraft time out, the completion share is the complement of the
+lateral-exit share and is not plotted separately.
+
+This trend is important when interpreting the delay results. Delay is
+computed only for aircraft that complete the corridor, whereas
+lateral exits remain part of the broader system outcome. The decline
+in completed-trip delay therefore coexists with a growing
+corridor-retention cost as equipage increases. The present experiment
+does not isolate the trajectory-level cause of these exits, although
+the pattern is consistent with stronger lateral avoidance becoming
+more consequential within a bounded corridor.
+
+Overall, the corridor experiment reveals a trade-off rather than a
+uniform benefit from increasing equipage. System throughput is broadly
+maintained, and completed-trip delay decreases, including for the
+unequipped ORCA-controlled subgroup under high demand. These efficiency
+patterns coexist with an increasing lateral-exit share and with
+conflict rates that vary non-monotonically across mixed-equipage
+levels. The results therefore suggest that partial deployment should
+be evaluated at the traffic-system level, where interactions between
+different avoidance conventions can generate externalities that are
+not visible in isolated encounter comparisons.
+
+
+
+
+
+\FloatBarrier
+\section{Conclusions}
+\label{sec:conclusions}
+
+This study set out to test two premises that govern how prediction is
+built and judged for tactical separation in low-altitude corridors:
+that a more accurate forecast buys a safer operation, and that letting
+the planner supervise the predictor buys more still. In a closed loop
+where separation is enforced as an explicit constraint, neither premise
+held in the form in which it is normally assumed. The reason is
+structural rather than incidental. A constraint layer that is doing its
+job absorbs forecast differences before they reach the trajectory, so
+the very mechanism that makes the operation safe also makes it
+insensitive to the quantity by which predictors are ranked. Prediction
+error and operational risk are not two measurements of one underlying
+quality; they are separated by a layer whose transfer characteristics
+are themselves a design variable.
+
+That observation reorganizes where safety argumentation should be
+directed. In the configuration studied here, the binding quantities
+were the manoeuvring authority available to execute an avoidance and
+the time available to begin it, not the fidelity of the forecast that
+triggered it. Both are properties of the vehicle and of the airspace
+rather than of the learned model, and both are already instruments of
+transportation policy. This suggests that corridor admission criteria
+should carry an explicit manoeuvre-performance floor, and that
+surveillance and corridor geometry should be evaluated by the response
+window they deliver to the aircraft that must use it. It also suggests
+a specific caution for the certification of learned components: a
+predictor validated only by displacement error, or validated in the
+loop of one planner configuration, has not been shown to be safe in
+the loop of another. Our cross-evaluation produced exactly that
+failure, with predictor differences compressed under one planner and
+reversed in sign under a second.
+
+For research practice, the implication is that a prediction model
+intended for separation should be reported together with the decision
+layer through which it will act, and with the envelope in which that
+layer must operate. Displacement error remains a legitimate measure of
+forecast quality; what does not follow is that improving it improves
+operations. Where a decision-focused objective is used, our results
+argue for reporting its effect under more than one downstream
+configuration, since the operational value we measured was not a stable
+attribute of the trained predictor. At the system level, the corridor
+experiment indicated that partial deployment of a new avoidance logic
+can help aircraft that have not adopted it, while shifting cost into a
+different currency, here corridor retention rather than delay. Such
+transfers between outcome dimensions are invisible in encounter-level
+comparison and argue for evaluating deployment programmes at the
+traffic-system level.
+
+Several limitations bound these conclusions and indicate what would
+sharpen them. The controlled experiments resolve one neighbouring
+aircraft, so simultaneous binding constraints are represented only in
+the exploratory corridor extension and never with feasibility
+attribution. The evaluation encounters are stress-test constructions,
+which makes the absolute rates unsuitable as estimates of operational
+risk even though the paired contrasts remain interpretable. The
+cross-planner comparison varies barrier coefficient, horizon, and
+acceleration limit jointly, so it establishes that the downstream
+configuration governs the expression of predictor differences without
+identifying which factor is responsible; a single-factor sweep would
+resolve this, and would also determine whether the effect is graded or
+threshold-like. Only one predictor was trained under the deployment
+configuration, leaving training stochasticity and configuration effects
+entangled on that side of the comparison. The corridor results rest on
+six replications of one geometry and are reported without significance
+testing. Finally, the wind field, vehicle model, and separation
+standard are fixed throughout, and the observed lead-time threshold is
+specific to the closing-speed distribution of the encounters used here;
+whether the same threshold governs other traffic mixes is an open
+question, though its invariance across planning horizons suggests it is
+set by encounter geometry rather than by planner design.
+
+The broader conclusion we draw is a methodological one. Modular
+autonomy is normally validated module by module, on the assumption that
+component quality composes into system quality. The evidence assembled
+here indicates that, for separation-critical operations, it does not
+compose in any fixed way: the same predictor was operationally
+indistinguishable from its baseline under one planner and substantially
+worse under another, without its forecasts changing at all. Assigning
+operational value to a prediction model therefore requires naming the
+loop in which it will act. Building instruments that can replay an
+encounter while exchanging one layer at a time, and reporting what such
+instruments reveal even when the answer is that a favoured mechanism
+did not help, seems to us a precondition for admitting learned
+components into shared airspace.
+
+%\bibliographystyle{elsarticle-num}
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\FloatBarrier
+\appendix
+\section{Proofs}
+\label{app:proofs}
+
+This appendix supplies the arguments deferred from
+Section~\ref{sec:method}. Appendix~\ref{app:invariance} proves
+Proposition~\ref{prop:forward-invariance}, on the clearance guaranteed
+by a feasible barrier recursion. Appendix~\ref{app:gradient} proves
+Proposition~\ref{prop:gradient}, on differentiability of the planning
+solution map, after a preliminary lemma establishing that the map from
+predicted positions to program data is itself smooth.
+Appendix~\ref{app:support} proves
+Proposition~\ref{prop:gradient-support}, which localizes the
+operational gradient to active barrier inequalities. Throughout,
+$t$ is a fixed planning instant, and we abbreviate the planned
+quantities as in~\eqref{eq:planning-qp}, writing $\bm{p}_k$ for
+$\bm{p}_{t+k\mid t}$ and $\hat{\bm{p}}^{\,i}_{k}$ for
+$\hat{\bm{p}}^{\,i}_{t+k\mid t}$.
+
+\subsection{Forward invariance of the planned clearance}
+\label{app:invariance}
+
+\begin{proof}[Proof of Proposition~\ref{prop:forward-invariance}]
+	Fix a neighbour $i\in\mathcal{N}_t$ and suppose the
+	program~\eqref{eq:planning-qp} admits a feasible point with
+	$\bm{\epsilon}=\bm{0}$. Feasibility of that point requires, for
+	every $k=1,\dots,H_p$,
+	\begin{equation}
+		\label{eq:app-recursion}
+		h^{i}_{k}\;\geq\;(1-\gamma)\,h^{i}_{k-1},
+		\qquad \gamma\in(0,1],
+	\end{equation}
+	where $h^i_k$ is the linearized clearance~\eqref{eq:cbf-barrier}
+	evaluated on the planned trajectory and $h^i_0$ is evaluated at the
+	current ego and neighbour positions under the convention
+	$\hat{\bm{p}}^{\,i}_{t\mid t}:=\bm{p}^i_t$.
+
+	\emph{Step 1: non-negativity along the horizon.} Since
+	$\gamma\in(0,1]$ we have $1-\gamma\in[0,1)$, so the multiplier in
+	\eqref{eq:app-recursion} is non-negative. Applying
+	\eqref{eq:app-recursion} inductively from $k=1$ therefore preserves
+	sign: if $h^i_{k-1}\geq0$ then
+	$h^i_k\geq(1-\gamma)h^i_{k-1}\geq0$. With the hypothesis
+	$h^i_0\geq0$ as the base case, induction on $k$ gives
+	\begin{equation}
+		\label{eq:app-geometric}
+		h^{i}_{k}\;\geq\;(1-\gamma)^{k}\,h^{i}_{0}\;\geq\;0,
+		\qquad k=0,1,\dots,H_p .
+	\end{equation}
+	The first inequality in~\eqref{eq:app-geometric} follows by chaining
+	\eqref{eq:app-recursion} $k$ times, which is valid because each
+	factor $(1-\gamma)$ is non-negative and the inequalities are
+	therefore preserved under multiplication. Note that for $\gamma=1$
+	the bound degenerates to $h^i_k\geq0$ for $k\geq1$, which is still
+	the conclusion required; the geometric factor is informative only
+	for $\gamma<1$.
+
+	\emph{Step 2: from the linearized clearance to Euclidean
+		separation.} Fix $k$ and let
+	$\bm{n}^{i}_{k}$ be the unit linearization direction of
+	Section~\ref{sec:method-planner}, so
+	$\|\bm{n}^{i}_{k}\|_2=1$. By~\eqref{eq:cbf-barrier},
+	\begin{equation}
+		\label{eq:app-halfspace}
+		h^{i}_{k}
+		=\bm{n}^{i\,\top}_{k}
+		\big(\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}\big)
+		-d_{\mathrm{sep}} .
+	\end{equation}
+	The Cauchy--Schwarz inequality gives
+	$\bm{n}^{i\,\top}_{k}\bm{z}\leq\|\bm{n}^{i}_{k}\|_2\|\bm{z}\|_2
+		=\|\bm{z}\|_2$ for any $\bm{z}\in\R^3$. Taking
+	$\bm{z}=\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}$ and
+	using~\eqref{eq:app-halfspace},
+	\begin{equation}
+		\big\|\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}\big\|_2
+		\;\geq\;
+		\bm{n}^{i\,\top}_{k}
+		\big(\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}\big)
+		\;=\;
+		h^{i}_{k}+d_{\mathrm{sep}}
+		\;\geq\;
+		d_{\mathrm{sep}},
+	\end{equation}
+	where the final inequality uses $h^i_k\geq0$
+	from~\eqref{eq:app-geometric}. Since $k\leq H_p$ and
+	$i\in\mathcal{N}_t$ were arbitrary, the planned trajectory keeps at
+	least the required clearance from every predicted mean position at
+	every planned step.
+\end{proof}
+
+\begin{remark}[What the argument does not deliver]
+	\label{rem:invariance-scope}
+	Three features of the proof delimit its reach, and each is measured
+	rather than assumed in Section~\ref{sec:results-mechanism}.
+	First, \eqref{eq:app-halfspace} compares the planned position with
+	the \emph{predicted} neighbour position, so the conclusion transfers
+	to the true traffic only insofar as the forecast is adequate at the
+	planned passing geometry. Second, the argument is stated at one
+	planning instant; because the planner is executed in receding
+	horizon, the per-instant conclusions chain into a closed-loop
+	property only if each replanned program again admits a feasible
+	point with $\bm{\epsilon}=\bm{0}$ and inherits $h^i_0\geq0$, which
+	is exactly what can fail when a refreshed prediction moves the
+	keep-clear region faster than the acceleration envelope can answer.
+	Third, the clearance lives on the double-integrator surrogate,
+	whereas the aircraft flies~\eqref{eq:dynamics} through the saturated
+	inner law, so surrogate--plant mismatch and the tilt and moment
+	clamps bound how faithfully the planned motion is realized. The
+	conservatism in Step~2 is one-sided and therefore harmless: the
+	projection bound can only understate the true Euclidean separation.
+\end{remark}
+
+\subsection{Differentiability of the planning solution map}
+\label{app:gradient}
+
+Write the decision vector of~\eqref{eq:planning-qp} as
+$\bm{z}=(\bm{a},\bm{p},\bm{v},\bm{\epsilon})\in\R^{n_z}$ and collect
+the predicted mean positions available at instant $t$ into
+$\bm{\mu}=\{\hat{\bm{p}}^{\,i}_{k}\}_{i\in\mathcal{N}_t,\,k\leq H_p}$.
+The program is then
+\begin{equation}
+	\label{eq:app-qp}
+	\min_{\bm{z}}\ \tfrac12\bm{z}^{\top}\!Q\,\bm{z}+\bm{c}^{\top}\bm{z}
+	\quad\text{s.t.}\quad
+	A\bm{z}=\bm{b},\qquad
+	G(\bm{\mu})\,\bm{z}\;\leq\;\bm{g}(\bm{\mu}),
+\end{equation}
+where the equality block collects the initial conditions and the
+double-integrator recursion, and the inequality block collects the
+acceleration bounds, the slack sign conditions, and the barrier
+recursion. Only the barrier rows depend on $\bm{\mu}$. The cost data
+$(Q,\bm{c})$ are independent of $\bm{\mu}$, since the objective
+of~\eqref{eq:planning-qp} involves only the reference route, the
+accelerations, and the slacks.
+
+A preliminary lemma is required, because $\bm{\mu}$ enters the barrier
+rows twice: directly through the offset in~\eqref{eq:cbf-barrier}, and
+through the linearization direction $\bm{n}^i_k$, which is itself a
+normalization and hence non-smooth where its argument vanishes.
+
+\begin{lemma}[Smoothness of the program data in the forecast]
+	\label{lem:data-smooth}
+	Let $\bm{\rho}^{i}_{k}
+		:=\bm{r}_{t+k}-\hat{\bm{p}}^{\,i}_{k}$ denote the offset from the
+	predicted position to its reference-route point, and suppose
+	$\rho^{i}_{k}:=\|\bm{\rho}^{i}_{k}\|_2\geq\rho_{\min}>0$ for every
+	$i$ and $k$. Then $\bm{n}^{i}_{k}
+		=\bm{\rho}^{i}_{k}/\rho^{i}_{k}$ is $C^{\infty}$ in
+	$\hat{\bm{p}}^{\,i}_{k}$ on that region, the maps
+	$\bm{\mu}\mapsto G(\bm{\mu})$ and $\bm{\mu}\mapsto\bm{g}(\bm{\mu})$
+	are $C^{\infty}$, and the derivative of the clearance
+	\eqref{eq:cbf-barrier} with respect to the predicted position is
+	\begin{equation}
+		\label{eq:app-dh}
+		\frac{\partial h^{i}_{k}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}}
+		=-\Big(
+		\bm{n}^{i}_{k}
+		+\tfrac{1}{\rho^{i}_{k}}
+		\big(I-\bm{n}^{i}_{k}\bm{n}^{i\,\top}_{k}\big)
+		\big(\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}\big)
+		\Big)^{\!\top}.
+	\end{equation}
+\end{lemma}
+
+\begin{proof}
+	The map $\bm{y}\mapsto\bm{y}/\|\bm{y}\|_2$ is $C^{\infty}$ on
+	$\R^3\setminus\{\bm{0}\}$, and $\hat{\bm{p}}^{\,i}_{k}\mapsto
+		\bm{\rho}^{i}_{k}$ is affine, so the composition
+	$\hat{\bm{p}}^{\,i}_{k}\mapsto\bm{n}^{i}_{k}$ is $C^{\infty}$
+	wherever $\rho^{i}_{k}>0$, which the hypothesis
+	$\rho^{i}_{k}\geq\rho_{\min}$ guarantees uniformly. Its Jacobian is
+	the standard normalization derivative
+	\begin{equation}
+		\label{eq:app-dn}
+		\frac{\partial\bm{n}^{i}_{k}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}}
+		=-\frac{1}{\rho^{i}_{k}}
+		\big(I-\bm{n}^{i}_{k}\bm{n}^{i\,\top}_{k}\big),
+	\end{equation}
+	the sign arising because $\bm{\rho}^{i}_{k}$ depends on
+	$\hat{\bm{p}}^{\,i}_{k}$ with a minus sign. Differentiating
+	\eqref{eq:cbf-barrier}, in which $\hat{\bm{p}}^{\,i}_{k}$ appears
+	both in the subtracted position and inside $\bm{n}^{i}_{k}$, and
+	applying the product rule,
+	\begin{equation}
+		\frac{\partial h^{i}_{k}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}}
+		=-\bm{n}^{i\,\top}_{k}
+		+\big(\bm{p}_{k}-\hat{\bm{p}}^{\,i}_{k}\big)^{\!\top}
+		\frac{\partial\bm{n}^{i}_{k}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}} ,
+	\end{equation}
+	and substituting~\eqref{eq:app-dn} and using the symmetry of the
+	projector $I-\bm{n}^{i}_{k}\bm{n}^{i\,\top}_{k}$
+	gives~\eqref{eq:app-dh}. Each barrier row
+	of~\eqref{eq:app-qp} is an affine function of the clearances
+	$h^{i}_{k}$ with constant coefficients determined by $\gamma$, which
+	is a compiled constant and not a program parameter, so smoothness of
+	the clearances in $\bm{\mu}$ transfers to $G$ and $\bm{g}$.
+\end{proof}
+
+\begin{remark}[Role of $\rho_{\min}$]
+	\label{rem:rhomin}
+	The transverse term in~\eqref{eq:app-dh} carries the factor
+	$1/\rho^{i}_{k}$ and therefore diverges as the predicted position
+	approaches its reference-route point, where the linearization
+	direction ceases to be defined. The hypothesis
+	$\rho^{i}_{k}\geq\rho_{\min}$ in
+	Proposition~\ref{prop:gradient} excludes precisely that degeneracy,
+	which is why it appears alongside the constraint-qualification
+	conditions rather than as a technical afterthought. In the
+	encounters used in this study the predicted neighbour positions stay
+	well away from the ego reference route, so the condition is not
+	binding in practice; it is stated because the gradient expression is
+	otherwise meaningless.
+\end{remark}
+
+\begin{proof}[Proof of Proposition~\ref{prop:gradient}]
+	Let $\bar{\bm{\mu}}$ denote the current forecast and
+	$(\bar{\bm{z}},\bar{\bm{\lambda}},\bar{\bm{\nu}})$ a primal--dual
+	solution of~\eqref{eq:app-qp} at $\bar{\bm{\mu}}$, with
+	$\bm{\lambda}$ the multipliers of the inequality block and
+	$\bm{\nu}$ those of the equality block. Let
+	$\mathcal{A}=\{j:\,\bm{G}_j(\bar{\bm{\mu}})\bar{\bm{z}}
+		=g_j(\bar{\bm{\mu}})\}$ be the active set at
+	$\bar{\bm{z}}$, and write $G_{\mathcal{A}},\bm{g}_{\mathcal{A}}$ for
+	the corresponding rows. By hypothesis the active constraint
+	gradients together with the rows of $A$ are linearly independent
+	(LICQ), strict complementarity holds, so
+	$\bar\lambda_j>0$ for $j\in\mathcal{A}$ and $\bar\lambda_j=0$
+	otherwise, and the Hessian $Q$ is positive definite on the null
+	space of the active constraints.
+
+	\emph{Step 1: reduction to a square nonlinear system.} Under strict
+	complementarity the inactive inequalities are slack at
+	$\bar{\bm{z}}$ and, by continuity of
+	$\bm{\mu}\mapsto(G,\bm{g})$ from Lemma~\ref{lem:data-smooth},
+	remain slack for $\bm{\mu}$ in a neighbourhood of
+	$\bar{\bm{\mu}}$; their multipliers remain zero. The
+	Karush--Kuhn--Tucker conditions therefore reduce, locally, to the
+	square system
+	\begin{equation}
+		\label{eq:app-kkt}
+		F(\bm{z},\bm{\lambda}_{\mathcal{A}},\bm{\nu};\,\bm{\mu})
+		:=
+		\begin{bmatrix}
+			Q\bm{z}+\bm{c}
+			+G_{\mathcal{A}}(\bm{\mu})^{\top}\bm{\lambda}_{\mathcal{A}}
+			+A^{\top}\bm{\nu}                                       \\[2pt]
+			G_{\mathcal{A}}(\bm{\mu})\bm{z}-\bm{g}_{\mathcal{A}}(\bm{\mu}) \\[2pt]
+			A\bm{z}-\bm{b}
+		\end{bmatrix}
+		=\bm{0},
+	\end{equation}
+	which the solution satisfies at $\bar{\bm{\mu}}$. By
+	Lemma~\ref{lem:data-smooth}, $F$ is $C^{\infty}$ in $\bm{\mu}$ and
+	affine, hence $C^{\infty}$, in
+	$(\bm{z},\bm{\lambda}_{\mathcal{A}},\bm{\nu})$.
+
+	\emph{Step 2: non-singularity of the KKT Jacobian.} The Jacobian
+	of~\eqref{eq:app-kkt} in the primal--dual variables is the saddle
+	matrix
+	\begin{equation}
+		\label{eq:app-jac}
+		J=
+		\begin{bmatrix}
+			Q                  & G_{\mathcal{A}}^{\top} & A^{\top} \\
+			G_{\mathcal{A}}    & 0                      & 0        \\
+			A                  & 0                      & 0
+		\end{bmatrix}.
+	\end{equation}
+	Let $C=\big[G_{\mathcal{A}};A\big]$ denote the stacked active and
+	equality rows, which has full row rank by LICQ. Suppose
+	$J(\bm{u},\bm{w})=\bm{0}$ with $\bm{u}\in\R^{n_z}$ and $\bm{w}$
+	collecting the dual components. The lower blocks give
+	$C\bm{u}=\bm{0}$, so $\bm{u}$ lies in the null space of $C$; the
+	upper block gives $Q\bm{u}+C^{\top}\bm{w}=\bm{0}$, and premultiplying
+	by $\bm{u}^{\top}$ yields
+	$\bm{u}^{\top}Q\bm{u}+(C\bm{u})^{\top}\bm{w}
+		=\bm{u}^{\top}Q\bm{u}=0$. Because $Q$ is positive definite on
+	$\ker C$ by the reduced-Hessian hypothesis, $\bm{u}=\bm{0}$. Then
+	$C^{\top}\bm{w}=\bm{0}$, and full row rank of $C$ forces
+	$\bm{w}=\bm{0}$. Hence $J$ is non-singular.
+
+	\emph{Step 3: implicit function theorem.} $F$ is continuously
+	differentiable in a neighbourhood of
+	$\big((\bar{\bm{z}},\bar{\bm{\lambda}}_{\mathcal{A}},\bar{\bm{\nu}}),
+		\bar{\bm{\mu}}\big)$, vanishes there, and has non-singular
+	Jacobian $J$ in the primal--dual variables by Step~2. The implicit
+	function theorem therefore supplies a neighbourhood of
+	$\bar{\bm{\mu}}$ and a continuously differentiable map
+	$\bm{\mu}\mapsto
+		\big(\bm{z}(\bm{\mu}),\bm{\lambda}_{\mathcal{A}}(\bm{\mu}),
+		\bm{\nu}(\bm{\mu})\big)$ satisfying~\eqref{eq:app-kkt}
+	identically, with
+	\begin{equation}
+		\label{eq:app-sens}
+		\begin{bmatrix}
+			\partial\bm{z}/\partial\bm{\mu} \\
+			\partial\bm{\lambda}_{\mathcal{A}}/\partial\bm{\mu} \\
+			\partial\bm{\nu}/\partial\bm{\mu}
+		\end{bmatrix}
+		=-J^{-1}\,
+		\frac{\partial F}{\partial\bm{\mu}} ,
+		\qquad
+		\frac{\partial F}{\partial\bm{\mu}}
+		=
+		\begin{bmatrix}
+			\big(\partial G_{\mathcal{A}}/\partial\bm{\mu}\big)^{\top}
+			\bar{\bm{\lambda}}_{\mathcal{A}}                              \\
+			\big(\partial G_{\mathcal{A}}/\partial\bm{\mu}\big)\bar{\bm{z}}
+			-\partial\bm{g}_{\mathcal{A}}/\partial\bm{\mu}                 \\
+			0
+		\end{bmatrix},
+	\end{equation}
+	where the blocks of $\partial F/\partial\bm{\mu}$ are evaluated
+	through~\eqref{eq:app-dh}. Shrinking the neighbourhood if necessary
+	so that the inactive inequalities remain slack and the active
+	multipliers remain strictly positive, the active set is locally
+	constant and the solution of~\eqref{eq:app-qp} coincides with that
+	of~\eqref{eq:app-kkt}. Since the commanded acceleration
+	$\bm{a}_{t\mid t}$ is a fixed coordinate projection of
+	$\bm{z}(\bm{\mu})$, the solution map~\eqref{eq:solution-map} is
+	continuously differentiable at $\bar{\bm{\mu}}$, and its derivative
+	is obtained by solving the linear system~\eqref{eq:app-sens}, which
+	is the linearized KKT system of the quadratic program at its
+	solution.
+\end{proof}
+
+\begin{remark}[Where the conclusion lapses]
+	\label{rem:gradient-scope}
+	The result is local and conditional, and the experiments are
+	designed not to rely on more. At a change of active set the
+	solution map remains continuous but is generally only directionally
+	differentiable, and the derivative computed
+	from~\eqref{eq:app-sens} is then a one-sided object; strict
+	complementarity is what excludes this case locally. Degenerate
+	solutions violating LICQ, and a reduced Hessian that is only
+	semi-definite, both break Step~2. The saturations of the inner
+	control law contribute their own switching surfaces, on which the
+	chain from the realized trajectory to $\bm{a}_{t\mid t}$ is
+	non-differentiable and, within saturated regions, has vanishing
+	derivative. Training therefore relies on almost-everywhere
+	differentiability rather than on global smoothness, which is
+	standard for optimization layers and is the sense in which
+	Proposition~\ref{prop:gradient} is used.
+\end{remark}
+
+\subsection{Support of the operational gradient}
+\label{app:support}
+
+\begin{proof}[Proof of Proposition~\ref{prop:gradient-support}]
+	Let $\mathcal{J}$ denote the operational part of~\eqref{eq:tasl},
+	that is, the terms
+	$\lambda_s\widetilde\Phi_{\mathrm{los}}
+		+\lambda_d\Phi_{\mathrm{dev}}
+		+\lambda_u\Phi_{\mathrm{effort}}$ evaluated on the realized
+	closed-loop trajectory, excluding the displacement anchor. Fix a
+	neighbour $i$, a planned step $k$, and consider the derivative of
+	$\mathcal{J}$ with respect to the predicted mean position
+	$\hat{\bm{p}}^{\,i}_{k}$.
+
+	\emph{Step 1: the forecast acts only through the solution map.}
+	Under Assumption~\ref{ass:dynamics} the realized trajectory depends
+	on the forecast only through the executed controls, and by
+	\eqref{eq:method-composition} the control at instant $t$ is
+	$\bu_t=\mathrm{Inner}(\bx_t,\bm{a}_{t\mid t})$ with
+	$\bm{a}_{t\mid t}$ the first commanded acceleration
+	of~\eqref{eq:solution-map}. The forecast enters no other term of
+	$\mathcal{J}$: the clearance $\bar h_t$
+	in~\eqref{eq:soft-los} is computed from the \emph{true} neighbour
+	positions, and $\Phi_{\mathrm{dev}},\Phi_{\mathrm{effort}}$ are
+	functions of the realized state and control. Hence the chain rule
+	gives
+	\begin{equation}
+		\label{eq:app-chain}
+		\frac{\partial\mathcal{J}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}}
+		=\frac{\partial\mathcal{J}}{\partial\bm{a}_{t\mid t}}\,
+		\frac{\partial\bm{a}_{t\mid t}}
+		{\partial\hat{\bm{p}}^{\,i}_{k}},
+	\end{equation}
+	so it suffices to show that the second factor vanishes under the
+	stated condition.
+
+	\emph{Step 2: inactive rows contribute nothing.} By
+	Proposition~\ref{prop:gradient} and~\eqref{eq:app-sens}, the
+	sensitivity of the solution to the forecast is
+	$\partial\bm{z}/\partial\bm{\mu}
+		=-\big[J^{-1}\,\partial F/\partial\bm{\mu}\big]_{\bm{z}}$, and
+	$\partial F/\partial\bm{\mu}$ involves only the active rows
+	$G_{\mathcal{A}},\bm{g}_{\mathcal{A}}$. Consequently, if
+	$\hat{\bm{p}}^{\,i}_{k}$ appears in no active row, then every block
+	of $\partial F/\partial\bm{\mu}$ in the corresponding columns is
+	zero: the first block carries the factor
+	$\bar{\bm{\lambda}}_{\mathcal{A}}$ restricted to active rows, and
+	the second and third blocks involve only
+	$\partial G_{\mathcal{A}}/\partial\bm{\mu}$ and
+	$\partial\bm{g}_{\mathcal{A}}/\partial\bm{\mu}$. Equivalently, in
+	the full-multiplier form of the optimality system the inactive rows
+	enter multiplied by $\bar\lambda_j=0$, so their parametric
+	derivatives are annihilated. Hence
+	$\partial\bm{a}_{t\mid t}/\partial\hat{\bm{p}}^{\,i}_{k}=\bm{0}$
+	whenever no active inequality depends on $\hat{\bm{p}}^{\,i}_{k}$.
+
+	\emph{Step 3: identifying which rows can depend on the forecast.}
+	The predicted position $\hat{\bm{p}}^{\,i}_{k}$ enters
+	\eqref{eq:app-qp} only through the clearance $h^{i}_{k}$, by
+	\eqref{eq:cbf-barrier} and Lemma~\ref{lem:data-smooth}; the
+	equality block, the acceleration bounds, the slack sign conditions,
+	and the cost data are all independent of it. The clearance
+	$h^{i}_{k}$ appears in the barrier
+	recursion~\eqref{eq:cbf-condition} exactly twice: on the
+	left-hand side of the inequality indexed $k$, and on the right-hand
+	side of the inequality indexed $k+1$. For the boundary indices, as
+	noted after~\eqref{eq:planning-qp}, $h^{i}_{0}$ enters only the
+	inequality at $k=1$ and $h^{i}_{H_p}$ only the inequality at
+	$k=H_p$. Therefore the only rows whose data depend on
+	$\hat{\bm{p}}^{\,i}_{k}$ are those two, and by Step~2 the derivative
+	vanishes unless at least one of them is active at the optimum.
+
+	\emph{Step 4: the residual signal.} When the derivative in
+	\eqref{eq:app-chain} vanishes, the total gradient of~\eqref{eq:tasl}
+	with respect to that predicted position reduces to the contribution
+	of the displacement anchor, namely
+	$\lambda_a\,\partial\mathcal{L}_{\mathrm{ADE}}
+		/\partial\hat{\bm{p}}^{\,i}_{k}$, since the anchor is evaluated
+	directly on the forecast and does not pass through the planner.
+	Composing with $\partial\hat{\bm{p}}^{\,i}_{k}/\partial\theta$ and
+	summing over neighbours and steps gives the statement for
+	$\nabla_\theta$.
+\end{proof}
+
+\begin{remark}[Interpretation and what it does not assert]
+	\label{rem:support-scope}
+	Proposition~\ref{prop:gradient-support} localizes the operational
+	signal but says nothing about its usefulness. Two consequences
+	matter for reading Section~\ref{sec:results-signal}. First, the
+	active set is a property of the planner configuration
+	$\phi=(w_{\mathrm{track}},w_{\mathrm{acc}},w_{\mathrm{slack}},
+		\gamma,a_{\max},H_p)$ as much as of the encounter, so the region
+	in which the objective can act at all changes when $\phi$ changes.
+	This is the formal counterpart of the cross-configuration
+	sensitivity reported in
+	Section~\ref{sec:results-boundary}, and it is why a predictor
+	trained through one planner has no structural reason to retain its
+	operational effect under another. Second, the proposition constrains
+	the support of the gradient, not the direction or magnitude of the
+	resulting parameter change; whether accuracy is in fact reallocated
+	toward the constraint-relevant region is
+	Hypothesis~\ref{hyp:reallocation}, which is tested empirically and,
+	in the configuration studied here, not supported. Because per-step
+	active-set logs were not retained during training, the CPA-centred
+	window used in
+	Section~\ref{sec:results-signal} serves as a proxy for the active
+	region identified here, and the mismatch between proxy and true
+	support is a limitation of that analysis rather than of this
+	proposition.
+\end{remark}
+
+\end{document}

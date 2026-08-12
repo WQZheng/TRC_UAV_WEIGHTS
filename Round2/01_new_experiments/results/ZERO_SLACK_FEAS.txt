@@ -1,0 +1,13 @@
+ZERO-SLACK FEASIBILITY RE-SOLVE  (best planner a=0.1 Hp=15 amax=20, n=200, seed 12345)
+checkpoint: stage2_final.pt   d_sep=30 m
+------------------------------------------------------------
+total conflict episodes                    : 22
+  with >=1 eps=0-INFEASIBLE step           : 22  (actuation-limited)
+  eps=0 FEASIBLE at every step             : 0  (slack-associated only)
+  fraction actuation-limited               : 100.0%
+  [dumped 22 per-conflict infeasible-step counts -> infeasible_steps.npy]
+  [dumped attribution_v2.npz: episode_ids/infeasible/cpa_step, infeasible.sum()=414]
+  [dumped 22x20 per-step infeasibility raster -> infeasibility_raster.npy]
+  infeasible steps per conflict (mean/max) : 18.82 / 20
+------------------------------------------------------------
+=> EVERY conflict has an eps=0-infeasible step: 'actuation-limited' is justified.
