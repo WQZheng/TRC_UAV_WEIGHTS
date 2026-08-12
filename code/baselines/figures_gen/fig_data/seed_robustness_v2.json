@@ -1,0 +1,66 @@
+{
+  "planner": "gamma=0.1 Hp=15 a_max=20 d_sep=30",
+  "n": 200,
+  "eval_seed": 12345,
+  "per_seed": {
+    "seed1": {
+      "CR_%": 12.0,
+      "conflicts": 24,
+      "ADE_m": 7.93042137774827,
+      "minSep_m": 47.917654334260824,
+      "Effort": 56.94110118990709,
+      "mcnemar_vs_Stage1b": {
+        "both": 23,
+        "b": 0,
+        "c": 1,
+        "neither": 176,
+        "p": 1.0,
+        "net_pp": 0.49999999999999906
+      }
+    },
+    "seed2": {
+      "CR_%": 11.0,
+      "conflicts": 22,
+      "ADE_m": 5.774400927300289,
+      "minSep_m": 47.3592183196188,
+      "Effort": 53.83893876274711,
+      "mcnemar_vs_Stage1b": {
+        "both": 21,
+        "b": 2,
+        "c": 1,
+        "neither": 176,
+        "p": 1.0,
+        "net_pp": -0.5000000000000004
+      }
+    },
+    "seed3": {
+      "CR_%": 11.5,
+      "conflicts": 23,
+      "ADE_m": 7.1591151474229955,
+      "minSep_m": 48.2856718824567,
+      "Effort": 58.21089657452969,
+      "mcnemar_vs_Stage1b": {
+        "both": 22,
+        "b": 1,
+        "c": 1,
+        "neither": 176,
+        "p": 1.0,
+        "net_pp": 0.0
+      }
+    }
+  },
+  "control": {
+    "stage2_final_CR_%": 11.0,
+    "stage2_final_conflicts": 22,
+    "Stage-1b_CR_%": 11.5,
+    "Stage-1b_conflicts": 23
+  },
+  "spread": {
+    "CR_mean": 11.5,
+    "CR_SD": 0.5,
+    "CR_SEM": 0.2886751345948129,
+    "ADE_mean": 6.954645817490518,
+    "ADE_SD": 1.0924567844311994,
+    "ADE_SEM": 0.6307302185693859
+  }
+}

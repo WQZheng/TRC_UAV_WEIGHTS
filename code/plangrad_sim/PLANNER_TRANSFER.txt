@@ -1,0 +1,56 @@
+CROSS-PLANNER TRANSFER OF THE TASK-ALIGNED OBJECTIVE
+  n=200 held-out 2500-2999, seed 12345, eta_w=0.3, wind seed 7,
+  d_sep=30.0 m, T=20, dt=0.2. Conflict := MinSep < 30.0 m.
+  training-time planner  gamma=0.4 H_p=8  a_max=10
+  deployment planner     gamma=0.1 H_p=15 a_max=20
+  Nothing is retrained. ADE is planner-independent (replayed neighbours).
+============================================================================
+  Stage-1           trained@-             ADE= 20.90 m   deploy CR= 12.5%   train-time CR= 56.5%
+  Stage-1b          trained@-             ADE=  1.84 m   deploy CR= 11.5%   train-time CR= 56.0%
+  Stage-2 primary   trained@training-time ADE=  4.32 m   deploy CR= 11.0%   train-time CR= 28.5%
+  Stage-2 seed1     trained@training-time ADE=  7.93 m   deploy CR= 12.0%   train-time CR= 27.5%
+  Stage-2 seed2     trained@training-time ADE=  5.77 m   deploy CR= 11.0%   train-time CR= 28.5%
+  Stage-2 seed3     trained@training-time ADE=  7.16 m   deploy CR= 11.5%   train-time CR= 27.0%
+  Stage-2 deploy    trained@deployment    ADE=  9.05 m   deploy CR= 13.5%   train-time CR= 69.0%
+
+  control: published CRs (56.5/56.0/28.5 train-time, 11.5/11.0 deploy)
+  and ADEs (20.90/1.84/4.32 m) all reproduced
+
+Q1  THREE ADDITIONAL SEEDS, ALL TRAINED UNDER (0.4, 8, 10),
+    NOW EVALUATED UNDER THAT SAME PLANNER
+    Stage-2 primary   CR= 28.5%  vs Stage-1b 56.0%  (-27.5 pp)  resolved= 55 introduced=  0  p=5.55e-17  nested=yes
+    Stage-2 seed1     CR= 27.5%  vs Stage-1b 56.0%  (-28.5 pp)  resolved= 57 introduced=  0  p=1.39e-17  nested=yes
+    Stage-2 seed2     CR= 28.5%  vs Stage-1b 56.0%  (-27.5 pp)  resolved= 55 introduced=  0  p=5.55e-17  nested=yes
+    Stage-2 seed3     CR= 27.0%  vs Stage-1b 56.0%  (-29.0 pp)  resolved= 58 introduced=  0  p=6.94e-18  nested=yes
+    family mean 27.9% +/- 0.7 (n=4, ddof=1), range 27.0-28.5%
+    deployment-trained checkpoint 69.0%
+    READ: all same-configuration checkpoints fall below the Stage-1b
+    reference while the deployment-trained one exceeds it, so the
+    favourable same-configuration outcome is reproducible across
+    training seeds and is not a property of one lucky run.
+
+Q2  DOES OPEN-LOOP ACCURACY ACCOUNT FOR THE DIVERGENCE?
+    deployment-trained checkpoint ADE = 9.05 m
+    under this planner ADE 20.90 m -> 56.5% and 1.84 m -> 56.0%,
+    an accuracy span of about 11x with almost no separation in outcome, so ADE has very
+    little discriminating power in this regime.
+    The deployment-trained checkpoint's ADE lies inside that span,
+    which rules out gross predictor failure as the explanation but
+    CANNOT establish planner-specific co-adaptation: error geometry,
+    temporal structure and optimisation quality remain uncontrolled.
+    Report as 'not explained by ADE alone and consistent with
+    planner-specific adaptation', never as proof.
+
+INTERACTION STRUCTURE (the claim the figure may make)
+    spread across Stage-2 checkpoints under deployment planner     2.5 pp
+    spread across Stage-2 checkpoints under training-time planner  42.0 pp
+    primary checkpoint: 11.0% under the deployment planner vs 28.5% under its OWN training planner
+    NOTE: the primary checkpoint is absolutely BETTER under the
+    planner it was NOT trained on, so the data do NOT form a
+    'each predictor is best under its own planner' diagonal. The
+    defensible statement is an asymmetric interaction: the
+    deployment planner attenuates differences between predictors,
+    the training-time planner exposes them. Figures must not imply
+    a matched-is-better diagonal.
+
+wrote /data/lab/TRC_UAV_WEIGHTS/code/baselines/figures_gen/fig_data/planner_transfer_v2.npz

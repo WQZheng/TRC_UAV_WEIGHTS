@@ -1,0 +1,38 @@
+FOURTH CELL: deployment-trained Stage-2 under the WEAK planner
+  weak planner gamma=0.4 H_p=8 a_max=10 (== the Stage-2 TRAINING planner)
+  n=200 held-out 2500-2999, seed 12345, eta_w=0.3, wind seed 7,
+  d_sep=30 m, T=20, dt=0.2. Conflict := min separation < 30 m.
+  Nothing is retrained; checkpoints are only re-evaluated.
+==========================================================================
+  stage1b          (stage1b_domainadapt.pt    )  CR =  56.0%   MinSep =  27.84 m
+  stage2_primary   (stage2_final.pt           )  CR =  28.5%   MinSep =  33.98 m
+  stage2_deploy    (stage2_matched.pt         )  CR =  69.0%   MinSep =  25.41 m
+
+  control: Stage-1b 56.0% and primary Stage-2 28.5% reproduced exactly,
+  together with the published paired 2x2 (57, 55, 0, 88)
+
+THE 2x2 (conflict rate, %)
+  Stage-2 trained at        deployment eval   weak eval
+  weak / training cfg                 11.0        28.5
+  deployment cfg                      13.5        69.0
+  Stage-1b reference                  11.5        56.0
+
+PAIRED: Stage-1b vs deployment-trained Stage-2, weak config
+  both conflict 103, only Stage-1b 9, only Stage-2 35, neither 53
+  risk difference +13.0 pp, exact McNemar p = 1.060e-04
+  nested (Stage-2 introduces no new conflict)? no
+
+PAIRED: primary vs deployment-trained Stage-2, weak config
+  discordant 0 / 81, risk difference +40.5 pp, exact McNemar p = 8.272e-25
+
+  published weak-config effect (Stage-1b -> primary Stage-2): 27.5 pp
+  effect retained by the deployment-trained checkpoint: -13.0 pp (-47% of it)
+
+  READ: the deployment-trained checkpoint is WORSE than Stage-1b
+  under the weak planner, so the published 28.5% cannot be read as
+  'weak planning restores task-aligned leverage' in general. The
+  effect is specific to the checkpoint whose training planner equals
+  the evaluation planner, i.e. a train-test MATCHING effect. The
+  central positive claim of 5.4 must be restated accordingly.
+
+wrote /data/lab/TRC_UAV_WEIGHTS/code/baselines/figures_gen/fig_data/weak_2x2_v2.npz

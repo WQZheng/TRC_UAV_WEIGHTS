@@ -5,6 +5,9 @@ total conflict episodes                    : 22
   with >=1 eps=0-INFEASIBLE step           : 22  (actuation-limited)
   eps=0 FEASIBLE at every step             : 0  (slack-associated only)
   fraction actuation-limited               : 100.0%
-  infeasible steps per conflict (mean/max) : 17.77 / 20
+  [dumped 22 per-conflict infeasible-step counts -> infeasible_steps.npy]
+  [dumped attribution_v2.npz: episode_ids/infeasible/cpa_step, infeasible.sum()=414]
+  [dumped 22x20 per-step infeasibility raster -> infeasibility_raster.npy]
+  infeasible steps per conflict (mean/max) : 18.82 / 20
 ------------------------------------------------------------
 => EVERY conflict has an eps=0-infeasible step: 'actuation-limited' is justified.
