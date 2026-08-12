@@ -11,6 +11,11 @@
 
 逐条改动与验证记录见 **[`CHANGELOG_ROUND2.md`](CHANGELOG_ROUND2.md)**。
 
+**模型与复现**见 **[`MODELS_AND_REPRODUCTION.md`](MODELS_AND_REPRODUCTION.md)**：
+9 个权重各是什么、论文里干什么用、逐权重 MD5、精确训练/评估命令，
+以及 4 处会导致复现出错的文档不一致（`--w_ade` 默认值、`--iters` 默认值、
+两个同名 trainer、γ 与 alpha 的符号对应）。
+
 ---
 
 ## 0. 目录结构
@@ -19,6 +24,7 @@
 Round2/
 ├── README_ROUND2.md               ← 本文件
 ├── CHANGELOG_ROUND2.md            ← 全部改动 + 验证证据（含 2 起严重问题留档）
+├── MODELS_AND_REPRODUCTION.md     ← 用了哪些模型 / 各自干什么 / 如何从零复现
 ├── 01_new_experiments/            Round1 遗留未提交的 5 项补充实验
 │   ├── scripts/                   4 个 export 脚本
 │   ├── results/                   5 个结果 txt（断言已写入文件内）
